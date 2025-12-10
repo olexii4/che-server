@@ -26,7 +26,8 @@ enum CHANNELS {
 }
 
 interface ServerConfig {
-  opts: Record<string, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  opts: any;
   server: string;
 }
 
@@ -47,8 +48,9 @@ export class KubeConfigService {
     this.kubeConfigYaml = kubeConfig.exportConfig();
 
     const server = kubeConfig.getCurrentCluster()?.server || '';
-    const opts: Record<string, unknown> = {};
-    kubeConfig.applyToRequest(opts as object);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const opts: any = {};
+    kubeConfig.applyToRequest(opts);
     this.serverConfig = { opts, server };
   }
 
