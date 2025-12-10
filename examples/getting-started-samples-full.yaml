@@ -1,0 +1,58 @@
+# Copyright (c) 2025 Red Hat, Inc.
+# This program and the accompanying materials are made
+# available under the terms of the Eclipse Public License 2.0
+# which is available at https://www.eclipse.org/legal/epl-2.0/
+#
+# SPDX-License-Identifier: EPL-2.0
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: getting-started-samples
+  namespace: eclipse-che # Update this to match your Che namespace
+  labels:
+    app.kubernetes.io/component: getting-started-samples
+    app.kubernetes.io/part-of: che.eclipse.org
+data:
+  samples.json: |-
+    [  
+      {
+        "displayName": "Eclipse Che Dashboard", 
+        "description": "Eclipse Che Dashboard Repository", 
+        "tags": ["yarn", "nodejs"],
+        "url": "https://github.com/eclipse-che/che-dashboard"
+      },
+      {
+        "displayName": "Eclipse Che Operator", 
+        "description": "Eclipse Che Operator Repository", 
+        "tags": ["go"], 
+        "url": "https://github.com/eclipse-che/che-operator"
+      },
+      {
+        "displayName": "Eclipse Che Server", 
+        "description": "Eclipse Che Server Repository", 
+        "tags": ["go"], 
+        "url": "https://github.com/eclipse-che/che-server"
+      },
+      {
+        "displayName": "Eclipse Che Plugin Registry", 
+        "description": "Eclipse Che Plugin Registry", 
+        "tags": ["go"], 
+        "url": "https://github.com/eclipse-che/che-plugin-registry"
+      }, 
+      {
+        "displayName": "Apache Camel Basics",
+        "description": "Gain familiarity with Apache Camel by getting hands-on following documented guidelines.",
+        "tags": ["camel", "spring", "spring-boot", "java", "quarkus"],
+        "url": "https://github.com/RedHat-Middleware-Workshops/devsandbox-camel",
+        "icon": {
+             "base64data": "PHN2ZyB2ZXJzaW9uPSIxLjEiIHZpZXdCb3g9IjAgMCAxMzAuMjEgMTMwLjAxIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8ZGVmcz4KPGxpbmVhckdyYWRpZW50IGlkPSJjIiB4MT0iMzMzLjQ4IiB4Mj0iNDc3IiB5MT0iNzAyLjYiIHkyPSI1NjMuNzMiIGdyYWRpZW50VHJhbnNmb3JtPSJtYXRyaXgoLjk5MjA2IDAgMCAuOTkyMDYgOTQuMDM4IDI3Ni4wNikiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KPHN0b3Agc3RvcC1jb2xvcj0iI0Y2OTkyMyIgb2Zmc2V0PSIwIi8+CjxzdG9wIHN0b3AtY29sb3I9IiNGNzlBMjMiIG9mZnNldD0iLjEwOTk2Ii8+CjxzdG9wIHN0b3AtY29sb3I9IiNFOTc4MjYiIG9mZnNldD0iLjk0NTAyIi8+CjwvbGluZWFyR3JhZGllbnQ+CjxsaW5lYXJHcmFkaWVudCBpZD0iYiIgeDE9IjMzMy40OCIgeDI9IjQ3NyIgeTE9IjcwMi42IiB5Mj0iNTYzLjczIiBncmFkaWVudFRyYW5zZm9ybT0ibWF0cml4KC45OTIwNiAwIDAgLjk5MjA2IDk0LjAzOCAyNzYuMDYpIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CjxzdG9wIHN0b3AtY29sb3I9IiNGNjk5MjMiIG9mZnNldD0iMCIvPgo8c3RvcCBzdG9wLWNvbG9yPSIjRjc5QTIzIiBvZmZzZXQ9Ii4wODA0NzgiLz4KPHN0b3Agc3RvcC1jb2xvcj0iI0U5NzgyNiIgb2Zmc2V0PSIuNDE4NzQiLz4KPC9saW5lYXJHcmFkaWVudD4KPGxpbmVhckdyYWRpZW50IGlkPSJhIiB4MT0iNjMzLjU1IiB4Mj0iNTY2LjQ3IiB5MT0iODE0LjYiIHkyPSI5MDkuMTIiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTg1LjQyMSA1Ni4yMzYpIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CjxzdG9wIHN0b3AtY29sb3I9IiNmNmU0MjMiIG9mZnNldD0iMCIvPgo8c3RvcCBzdG9wLWNvbG9yPSIjRjc5QTIzIiBvZmZzZXQ9Ii40MTE5MSIvPgo8c3RvcCBzdG9wLWNvbG9yPSIjRTk3ODI2IiBvZmZzZXQ9Ii43MzI3MSIvPgo8L2xpbmVhckdyYWRpZW50Pgo8L2RlZnM+CjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKC00MzcuODkgLTgzNS4yOSkiPgo8Y2lyY2xlIGN4PSI1MDMuMSIgY3k9IjkwMC4yOSIgcj0iNjIuNTIiIGZpbGw9InVybCgjYykiIHN0cm9rZT0idXJsKCNiKSIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLXdpZHRoPSI0Ljk2MDMiLz4KPHBhdGggZD0ibTQ4Ny44OSA4NzMuNjRjLTAuODg5MDYtMWUtMyAtMS43ODk3IDVlLTMgLTIuNjg3NSAwLjAzMTItMS4wNDM3IDAuMDMwOC0yLjQ0NTkgMC4zNjIxOC00LjA2MjUgMC45MDYyNSAyNy4zMDkgMjAuNzM3IDM3LjEyNyA1OC4xNDYgMjAuMjUgOTAuNjU2IDAuNTczMTcgMC4wMTQ5IDEuMTQyIDAuMDYyNSAxLjcxODggMC4wNjI1IDMwLjg0NCAwIDU2LjYyLTIxLjQ5MyA2My4yODEtNTAuMzEyLTE5LjU3My0yMi45NDMtNDYuMTE4LTQxLjI5NC03OC41LTQxLjM0NHoiIGZpbGw9InVybCgjYSkiIG9wYWNpdHk9Ii43NSIvPgo8cGF0aCBkPSJtNDgxLjE0IDg3NC41OGMtOS4wNjgyIDMuMDUxOC0yNi4zNjggMTMuODAyLTQzIDI4LjE1NiAxLjI2MzEgMzQuMTk1IDI4Ljk2MSA2MS42MDcgNjMuMjUgNjIuNSAxNi44NzctMzIuNTEgNy4wNTk0LTY5LjkxOS0yMC4yNS05MC42NTZ6IiBmaWxsPSIjMjgxNzBiIiBvcGFjaXR5PSIuNzUiLz4KPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTg1LjQyMSA1Ni4yMzYpIj4KPHBhdGggZD0ibTU5MC4zMSA4MDYuMzFjLTAuNDcyMzktMC4wMzIxLTAuOTMxNTEgMC4wMjg0LTEuMzc1IDAuMjUtNS41OTkyIDIuODAxMSAwIDE0IDAgMTQtMTYuODA3IDE0LjAwOS0xMy4yMzYgMzcuOTM4LTMyLjg0NCAzNy45MzgtMTAuNjg5IDAtMjEuMzIyLTEyLjI5My0zMi41MzEtMTkuODEyLTAuMTQ0MyAxLjc3MzMtMC4yNSAzLjU2NDUtMC4yNSA1LjM3NSAwIDI0LjUxNSAxMy41MSA0NS44NjMgMzMuNDY5IDU3LjA2MyA1LjU4MjgtMC43MDMyMSAxMS4xNTgtMi4xMTM5IDE1LjM0NC00LjkwNjIgMjEuOTkyLTE0LjY2MiAyNy40NTItNDIuNTU3IDM2LjQzOC01Ni4wMzEgNS41OTYyLTguNDA2MyAzMS44MjQtNy42NzY5IDMzLjU5NC0xMS4yMTkgMi44MDQxLTUuNjAyMi01LjYwMjEtMTQtOC40MDYyLTE0aC0yMi40MDZjLTEuNTY1NSAwLTQuMDI1My0yLjc4MTItNS41OTM4LTIuNzgxMmgtOC40MDYycy0zLjcyNDUtNS42NTAzLTcuMDMxMi01Ljg3NXoiIGZpbGw9IiNmZmYiLz4KPC9nPgo8L2c+Cjwvc3ZnPg==",
+             "mediatype": "image/svg+xml"
+         }
+      }
+    ]
+
+
+
+
+

@@ -1,0 +1,67 @@
+### Test script for REST Client (VS Code) or IntelliJ HTTP Client
+### Install "REST Client" extension in VS Code to use this file
+
+@baseUrl = http://localhost:8080
+@username = johndoe
+@userid = user123
+
+### Health Check
+GET {{baseUrl}}/health
+
+### Provision Namespace (Bearer Token)
+POST {{baseUrl}}/kubernetes/namespace/provision
+Authorization: Bearer {{userid}}:{{username}}
+Content-Type: application/json
+
+### Provision Namespace (Basic Auth)
+POST {{baseUrl}}/kubernetes/namespace/provision
+Authorization: Basic {{username}}:{{userid}}
+Content-Type: application/json
+
+### List Namespaces
+GET {{baseUrl}}/kubernetes/namespace
+Authorization: Bearer {{userid}}:{{username}}
+
+### Provision for Different User
+POST {{baseUrl}}/kubernetes/namespace/provision
+Authorization: Bearer user456:janedoe
+Content-Type: application/json
+
+### Test Unauthorized Request (should fail)
+POST {{baseUrl}}/kubernetes/namespace/provision
+Content-Type: application/json
+
+### Resolve Factory from URL
+POST {{baseUrl}}/factory/resolver
+Authorization: Bearer {{userid}}:{{username}}
+Content-Type: application/json
+
+{
+  "url": "https://raw.githubusercontent.com/eclipse/che/main/devfile.yaml"
+}
+
+### Resolve Factory with Validation
+POST {{baseUrl}}/factory/resolver?validate=true
+Authorization: Bearer {{userid}}:{{username}}
+Content-Type: application/json
+
+{
+  "url": "https://example.com/devfile.yaml"
+}
+
+### Refresh Factory Token
+POST {{baseUrl}}/factory/token/refresh?url=https://github.com/user/repo
+Authorization: Bearer {{userid}}:{{username}}
+Content-Type: application/json
+
+### Resolve Factory without Parameters (should fail)
+POST {{baseUrl}}/factory/resolver
+Authorization: Bearer {{userid}}:{{username}}
+Content-Type: application/json
+
+{}
+
+### Test Invalid Route (should return 404)
+GET {{baseUrl}}/invalid/route
+Authorization: Bearer {{userid}}:{{username}}
+

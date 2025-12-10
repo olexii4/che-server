@@ -1,0 +1,16 @@
+# Dependencies
+node_modules
+.yarn
+
+# Build outputs
+dist
+build
+coverage
+
+# Lock files
+yarn.lock
+package-lock.json
+
+# Documentation
+CHANGELOG.md
+

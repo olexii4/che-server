@@ -1,0 +1,104 @@
+###
+# Factory Resolver Examples
+# Demonstrates the fixed devfile URL handling
+###
+
+### Example 1: GitHub Repository URL (NEW - Now Works!)
+# Before fix: Required full URL like https://github.com/user/repo/blob/main/devfile.yaml
+# After fix: Automatically tries devfile.yaml and .devfile.yaml
+POST {{baseUrl}}/factory/resolver
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "url": "https://github.com/eclipse/che"
+}
+
+### Example 2: GitHub Repository with Branch
+POST {{baseUrl}}/factory/resolver
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "url": "https://github.com/eclipse/che/tree/main"
+}
+
+### Example 3: GitHub Repository with .git suffix
+POST {{baseUrl}}/factory/resolver
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "url": "https://github.com/eclipse/che.git"
+}
+
+### Example 4: GitLab Repository URL (NEW - Now Works!)
+POST {{baseUrl}}/factory/resolver
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "url": "https://gitlab.com/gitlab-org/gitlab"
+}
+
+### Example 5: GitLab with Subgroups
+POST {{baseUrl}}/factory/resolver
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "url": "https://gitlab.com/group/subgroup/project"
+}
+
+### Example 6: Direct Devfile URL (Backward Compatible)
+POST {{baseUrl}}/factory/resolver
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "url": "https://raw.githubusercontent.com/eclipse/che/main/devfile.yaml"
+}
+
+### Example 7: Direct Devfile URL with .devfile.yaml
+POST {{baseUrl}}/factory/resolver
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "url": "https://raw.githubusercontent.com/eclipse/che/main/.devfile.yaml"
+}
+
+### Example 8: GitHub with Pull Request (if supported)
+POST {{baseUrl}}/factory/resolver
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "url": "https://github.com/eclipse/che/pull/123"
+}
+
+### Example 9: Bitbucket Repository URL
+POST {{baseUrl}}/factory/resolver
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "url": "https://bitbucket.org/workspace/repository"
+}
+
+### Example 10: Invalid URL (Should provide helpful error)
+POST {{baseUrl}}/factory/resolver
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "url": "https://example.com/not-a-scm-url"
+}
+
+###
+# Variables
+# Set these in your HTTP client settings or .env file
+###
+# baseUrl=http://localhost:8080
+# token=your-bearer-token
+
