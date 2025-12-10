@@ -14,12 +14,12 @@ jest.mock('../../helpers/getKubernetesClient', () => ({
   getKubeConfig: jest.fn().mockReturnValue({ makeApiClient: jest.fn() }),
 }));
 
-const mockListSshKeys = jest.fn();
+const mockList = jest.fn();
 jest.mock('../../services/SSHKeysService', () => ({
   SSHKeysService: jest.fn().mockImplementation(() => ({
-    listSshKeys: mockListSshKeys,
-    addSshKey: jest.fn(),
-    deleteSshKey: jest.fn(),
+    list: mockList,
+    add: jest.fn(),
+    delete: jest.fn(),
   })),
 }));
 
@@ -40,7 +40,7 @@ describe('sshKeysRoutes', () => {
   afterEach(async () => { await fastify.close(); });
 
   it('GET /namespace/:namespace/ssh-key returns SSH keys', async () => {
-    mockListSshKeys.mockResolvedValue([{ name: 'my-key', keyPub: 'ssh-rsa AAAA...' }]);
+    mockList.mockResolvedValue([{ name: 'my-key', keyPub: 'ssh-rsa AAAA...' }]);
     const response = await fastify.inject({ method: 'GET', url: '/namespace/admin-che/ssh-key' });
     expect(response.statusCode).toBe(200);
     expect(JSON.parse(response.body)).toHaveLength(1);

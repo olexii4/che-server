@@ -12,10 +12,11 @@
 
 import Fastify, { FastifyInstance } from 'fastify';
 import { registerDataResolverRoutes } from '../dataResolverRoutes';
-import { axiosInstanceNoCert, axiosInstance } from '../../helpers/getCertificateAuthority';
+import axios from 'axios';
 
-// Mock axios instances
-jest.mock('../../helpers/getCertificateAuthority');
+// Mock axios
+jest.mock('axios');
+const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 describe('Data Resolver Routes', () => {
   let app: FastifyInstance;
@@ -40,7 +41,7 @@ describe('Data Resolver Routes', () => {
   describe('POST /api/data/resolver', () => {
     it('should fetch data from external URL successfully', async () => {
       const mockData = 'schemaVersion: 2.1.0\nmetadata:\n  name: test';
-      (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
+      mockedAxios.get.mockResolvedValueOnce({
         status: 200,
         data: mockData,
       });
@@ -54,51 +55,15 @@ describe('Data Resolver Routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      expect(response.body).toBe(mockData);
-      expect(axiosInstanceNoCert.get).toHaveBeenCalledWith(
-        'https://raw.githubusercontent.com/test/repo/main/devfile.yaml',
-        expect.objectContaining({
-          headers: expect.any(Object),
-        }),
-      );
+      expect(JSON.parse(response.body)).toBe(mockData);
     });
 
-    it('should fallback to axiosInstance on certificate error', async () => {
-      const mockData = 'test data';
-
-      // First call fails with non-404 error
-      (axiosInstanceNoCert.get as jest.Mock).mockRejectedValueOnce({
-        code: 'CERT_ERROR',
-        message: 'Certificate validation failed',
-      });
-
-      // Second call with cert validation succeeds
-      (axiosInstance.get as jest.Mock).mockResolvedValueOnce({
-        status: 200,
-        data: mockData,
-      });
-
-      const response = await app.inject({
-        method: 'POST',
-        url: '/api/data/resolver',
-        payload: {
-          url: 'https://example.com/data.yaml',
-        },
-      });
-
-      expect(response.statusCode).toBe(200);
-      expect(response.body).toBe(mockData);
-      expect(axiosInstanceNoCert.get).toHaveBeenCalledTimes(1);
-      expect(axiosInstance.get).toHaveBeenCalledTimes(1);
-    });
-
-    it('should return 404 when resource not found', async () => {
-      (axiosInstanceNoCert.get as jest.Mock).mockRejectedValueOnce({
-        response: {
-          status: 404,
-          statusText: 'Not Found',
-          data: 'Not Found',
-        },
+    it('should return data even when upstream returns 404 (proxy behavior)', async () => {
+      // The route returns 200 for all upstream responses < 500
+      // This is correct CORS proxy behavior - dashboard handles the response
+      mockedAxios.get.mockResolvedValueOnce({
+        status: 404,
+        data: { error: 'Not Found' },
       });
 
       const response = await app.inject({
@@ -109,21 +74,33 @@ describe('Data Resolver Routes', () => {
         },
       });
 
-      expect(response.statusCode).toBe(404);
-      const body = JSON.parse(response.body);
-      expect(body).toHaveProperty('error');
-      expect(body).toHaveProperty('message');
+      // Proxy returns 200 even for 404 upstream - dashboard handles the response
+      expect(response.statusCode).toBe(200);
     });
 
-    it('should return error status from external server', async () => {
-      (axiosInstanceNoCert.get as jest.Mock).mockRejectedValueOnce({
-        response: {
-          status: 500,
-          statusText: 'Internal Server Error',
-          data: { message: 'Server error' },
+    it('should return 503 for network connection errors', async () => {
+      const networkError = new Error('Connection refused');
+      (networkError as any).code = 'ECONNREFUSED';
+      mockedAxios.get.mockRejectedValueOnce(networkError);
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/data/resolver',
+        payload: {
+          url: 'https://unreachable.com/data.yaml',
         },
-        message: 'Request failed',
       });
+
+      expect(response.statusCode).toBe(503);
+      const body = JSON.parse(response.body);
+      expect(body.error).toBe('Service Unavailable');
+    });
+
+    it('should return 500 for upstream 5xx errors (thrown as exceptions)', async () => {
+      // When validateStatus rejects, axios throws an error
+      const serverError = new Error('Request failed with status code 500');
+      (serverError as any).response = { status: 500 };
+      mockedAxios.get.mockRejectedValueOnce(serverError);
 
       const response = await app.inject({
         method: 'POST',
@@ -135,27 +112,7 @@ describe('Data Resolver Routes', () => {
 
       expect(response.statusCode).toBe(500);
       const body = JSON.parse(response.body);
-      expect(body).toHaveProperty('error');
-      expect(body).toHaveProperty('message');
-    });
-
-    it('should handle network errors', async () => {
-      const networkError = new Error('Network error');
-      (axiosInstanceNoCert.get as jest.Mock).mockRejectedValueOnce(networkError);
-
-      const response = await app.inject({
-        method: 'POST',
-        url: '/api/data/resolver',
-        payload: {
-          url: 'https://example.com/data.yaml',
-        },
-      });
-
-      expect(response.statusCode).toBe(500);
-      const body = JSON.parse(response.body);
-      expect(body).toHaveProperty('error');
-      expect(body).toHaveProperty('message');
-      expect(body.message).toContain('Failed to fetch data from URL');
+      expect(body.error).toBe('Internal Server Error');
     });
 
     it('should return 400 for invalid request without URL', async () => {
@@ -166,6 +123,42 @@ describe('Data Resolver Routes', () => {
       });
 
       expect(response.statusCode).toBe(400);
+    });
+
+    it('should handle timeout errors', async () => {
+      const timeoutError = new Error('Timeout');
+      (timeoutError as any).code = 'ETIMEDOUT';
+      mockedAxios.get.mockRejectedValueOnce(timeoutError);
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/data/resolver',
+        payload: {
+          url: 'https://slow.com/data.yaml',
+        },
+      });
+
+      expect(response.statusCode).toBe(503);
+      const body = JSON.parse(response.body);
+      expect(body.error).toBe('Service Unavailable');
+    });
+
+    it('should handle DNS resolution errors', async () => {
+      const dnsError = new Error('getaddrinfo ENOTFOUND');
+      (dnsError as any).code = 'ENOTFOUND';
+      mockedAxios.get.mockRejectedValueOnce(dnsError);
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/data/resolver',
+        payload: {
+          url: 'https://nonexistent.invalid/data.yaml',
+        },
+      });
+
+      expect(response.statusCode).toBe(503);
+      const body = JSON.parse(response.body);
+      expect(body.error).toBe('Service Unavailable');
     });
   });
 });

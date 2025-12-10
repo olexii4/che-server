@@ -14,13 +14,13 @@ jest.mock('../../helpers/getKubernetesClient', () => ({
   getKubeConfig: jest.fn().mockReturnValue({ makeApiClient: jest.fn() }),
 }));
 
-const mockListTokens = jest.fn();
+const mockListInNamespace = jest.fn();
 jest.mock('../../services/PersonalAccessTokenService', () => ({
   PersonalAccessTokenService: jest.fn().mockImplementation(() => ({
-    listPersonalAccessTokens: mockListTokens,
-    addPersonalAccessToken: jest.fn(),
-    updatePersonalAccessToken: jest.fn(),
-    deletePersonalAccessToken: jest.fn(),
+    listInNamespace: mockListInNamespace,
+    create: jest.fn(),
+    replace: jest.fn(),
+    delete: jest.fn(),
   })),
 }));
 
@@ -41,7 +41,7 @@ describe('personalAccessTokenRoutes', () => {
   afterEach(async () => { await fastify.close(); });
 
   it('GET /namespace/:namespace/personal-access-token returns tokens', async () => {
-    mockListTokens.mockResolvedValue([{ tokenName: 'github-token', cheUserId: 'admin' }]);
+    mockListInNamespace.mockResolvedValue([{ tokenName: 'github-token', cheUserId: 'admin' }]);
     const response = await fastify.inject({ method: 'GET', url: '/namespace/admin-che/personal-access-token' });
     expect(response.statusCode).toBe(200);
     expect(JSON.parse(response.body)).toHaveLength(1);

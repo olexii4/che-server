@@ -14,11 +14,12 @@ jest.mock('../../helpers/getKubernetesClient', () => ({
   getKubeConfig: jest.fn().mockReturnValue({ makeApiClient: jest.fn() }),
 }));
 
-const mockGetGitConfig = jest.fn();
+const mockRead = jest.fn();
+const mockPatch = jest.fn();
 jest.mock('../../services/GitConfigService', () => ({
   GitConfigService: jest.fn().mockImplementation(() => ({
-    getGitConfig: mockGetGitConfig,
-    patchGitConfig: jest.fn(),
+    read: mockRead,
+    patch: mockPatch,
   })),
 }));
 
@@ -39,7 +40,7 @@ describe('gitConfigRoutes', () => {
   afterEach(async () => { await fastify.close(); });
 
   it('GET /namespace/:namespace/gitconfig returns git config', async () => {
-    mockGetGitConfig.mockResolvedValue({ user: { name: 'admin', email: 'admin@test.com' } });
+    mockRead.mockResolvedValue({ user: { name: 'admin', email: 'admin@test.com' } });
     const response = await fastify.inject({ method: 'GET', url: '/namespace/admin-che/gitconfig' });
     expect(response.statusCode).toBe(200);
   });

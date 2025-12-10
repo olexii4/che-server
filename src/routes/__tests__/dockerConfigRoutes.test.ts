@@ -14,11 +14,11 @@ jest.mock('../../helpers/getKubernetesClient', () => ({
   getKubeConfig: jest.fn().mockReturnValue({ makeApiClient: jest.fn() }),
 }));
 
-const mockGetDockerConfig = jest.fn();
+const mockRead = jest.fn();
 jest.mock('../../services/DockerConfigService', () => ({
   DockerConfigService: jest.fn().mockImplementation(() => ({
-    readDockerConfig: mockGetDockerConfig,
-    updateDockerConfig: jest.fn(),
+    read: mockRead,
+    update: jest.fn(),
   })),
 }));
 
@@ -39,7 +39,7 @@ describe('dockerConfigRoutes', () => {
   afterEach(async () => { await fastify.close(); });
 
   it('GET /namespace/:namespace/dockerconfig returns docker config', async () => {
-    mockGetDockerConfig.mockResolvedValue({ resourceVersion: '123', dockerconfig: '{}' });
+    mockRead.mockResolvedValue('{}');
     const response = await fastify.inject({ method: 'GET', url: '/namespace/admin-che/dockerconfig' });
     expect(response.statusCode).toBe(200);
   });
