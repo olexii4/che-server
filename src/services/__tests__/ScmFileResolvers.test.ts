@@ -72,7 +72,8 @@ describe('GitHubFileResolver', () => {
       expect(axiosInstanceNoCert.get).toHaveBeenCalled();
     });
 
-    it('should throw UnauthorizedException on 404 without authorization', async () => {
+    it('should throw file not found error on 404 without authorization', async () => {
+      // For GitHub raw URLs, 404 means file doesn't exist (not private repo)
       (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
         status: 404,
         statusText: 'Not Found',
@@ -80,7 +81,7 @@ describe('GitHubFileResolver', () => {
 
       await expect(
         resolver.fileContent('https://github.com/user/repo', 'missing.md'),
-      ).rejects.toThrow(UnauthorizedException);
+      ).rejects.toThrow('not found');
     });
 
     it('should throw file not found error on 404 with authorization', async () => {
@@ -107,15 +108,16 @@ describe('GitHubFileResolver', () => {
   });
 
   describe('fileContent() without file path (auto-detect devfile)', () => {
-    it('should throw UnauthorizedException if no devfile found without auth', async () => {
-      // All attempts fail with 404 - should treat as private repo
+    it('should throw Error if no devfile found without auth', async () => {
+      // All attempts fail with 404 - file doesn't exist
+      // For GitHub raw URLs, 404 means file not found (not private repo)
       (axiosInstanceNoCert.get as jest.Mock).mockResolvedValue({
         status: 404,
         statusText: 'Not Found',
       });
 
       await expect(resolver.fileContent('https://github.com/user/repo')).rejects.toThrow(
-        UnauthorizedException,
+        'No devfile found',
       );
     });
 

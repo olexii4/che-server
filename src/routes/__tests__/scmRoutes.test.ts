@@ -80,8 +80,10 @@ describe('SCM Routes (Fastify)', () => {
       expect(body.message).toContain('file');
     });
 
-    it('should return 401 without authentication', async () => {
-      // Mock axios to return 404, which should trigger UnauthorizedException when no auth provided
+    it('should return 404 when file not found without authentication', async () => {
+      // Mock axios to return 404
+      // For GitHub raw URLs, 404 means file doesn't exist (public repo)
+      // We don't assume private repo and prompt for auth
       (axiosInstanceNoCert.get as jest.Mock).mockResolvedValue({
         status: 404,
         statusText: 'Not Found',
@@ -92,7 +94,9 @@ describe('SCM Routes (Fastify)', () => {
         url: '/scm/resolve?repository=https://github.com/user/repo&file=devfile.yaml',
       });
 
-      expect(response.statusCode).toBe(401);
+      expect(response.statusCode).toBe(404);
+      const body = JSON.parse(response.body);
+      expect(body.message).toContain('not found');
     });
 
     it('should resolve file from valid URL with authentication', async () => {

@@ -216,50 +216,11 @@ export class GitHubFileResolver implements ScmFileResolver {
       // Try without certificate validation first (for public URLs)
       axiosResponse = await axiosInstanceNoCert.get(url, config);
     } catch (error: any) {
-      // If 404, check if we should treat it as authentication error
+      // If 404, file doesn't exist - throw file not found (don't assume private repo)
       if (error.response?.status === 404) {
-        if (!authorization) {
-          // No auth + 404 = might be private repo
-          logger.info(
-            `[GitHubFileResolver] 404 without authorization - treating as potential private repository`,
-          );
-          const oauthProvider = 'github';
-          const authenticateUrl = buildOAuthAuthenticateUrl(
-            process.env.CHE_API_ENDPOINT || 'http://localhost:8080',
-            oauthProvider,
-            'repo',
-            'POST',
-            'rsa',
-          );
-          throw new UnauthorizedException(
-            'SCM Authentication required',
-            oauthProvider,
-            '2.0',
-            authenticateUrl,
-          );
-        }
-
-        // Check if Basic auth was provided - GitHub doesn't support Basic auth, so 404 means auth failed
-        if (authorization && authorization.startsWith('Basic ')) {
-          logger.info(
-            `[GitHubFileResolver] 404 with Basic auth - GitHub requires OAuth token (Bearer), not Basic auth`,
-          );
-          const oauthProvider = 'github';
-          const authenticateUrl = buildOAuthAuthenticateUrl(
-            process.env.CHE_API_ENDPOINT || 'http://localhost:8080',
-            oauthProvider,
-            'repo',
-            'POST',
-            'rsa',
-          );
-          throw new UnauthorizedException(
-            'SCM Authentication required',
-            oauthProvider,
-            '2.0',
-            authenticateUrl,
-          );
-        }
-
+        logger.info(
+          `[GitHubFileResolver] 404 exception - file not found at ${url}`,
+        );
         throw new Error(SCM_CONSTANTS.ERRORS.FILE_NOT_FOUND);
       }
       // For other errors, try with certificate validation
@@ -267,48 +228,12 @@ export class GitHubFileResolver implements ScmFileResolver {
     }
 
     if (axiosResponse.status === 404) {
-      if (!authorization) {
-        // No auth + 404 = might be private repo
-        logger.info(
-          `[GitHubFileResolver] 404 without authorization - treating as potential private repository`,
-        );
-        const oauthProvider = 'github';
-        const authenticateUrl = buildOAuthAuthenticateUrl(
-          process.env.CHE_API_ENDPOINT || 'http://localhost:8080',
-          oauthProvider,
-          'repo',
-          'POST',
-          'rsa',
-        );
-        throw new UnauthorizedException(
-          'SCM Authentication required',
-          oauthProvider,
-          '2.0',
-          authenticateUrl,
-        );
-      }
-
-      // Check if Basic auth was provided - GitHub doesn't support Basic auth, so 404 means auth failed
-      if (authorization && authorization.startsWith('Basic ')) {
-        logger.info(
-          `[GitHubFileResolver] 404 with Basic auth - GitHub requires OAuth token (Bearer), not Basic auth`,
-        );
-        const oauthProvider = 'github';
-        const authenticateUrl = buildOAuthAuthenticateUrl(
-          process.env.CHE_API_ENDPOINT || 'http://localhost:8080',
-          oauthProvider,
-          'repo',
-          'POST',
-          'rsa',
-        );
-        throw new UnauthorizedException(
-          'SCM Authentication required',
-          oauthProvider,
-          '2.0',
-          authenticateUrl,
-        );
-      }
-
+      // For GitHub's raw.githubusercontent.com, 404 simply means file doesn't exist
+      // We should NOT assume it's a private repo - just throw file not found
+      // and let the caller try the next devfile filename
+      logger.info(
+        `[GitHubFileResolver] 404 - file not found at ${url}`,
+      );
       throw new Error(SCM_CONSTANTS.ERRORS.FILE_NOT_FOUND);
     }
 

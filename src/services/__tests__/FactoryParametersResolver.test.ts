@@ -402,8 +402,9 @@ describe('ScmRepositoryFactoryResolver', () => {
       );
     });
 
-    it('should throw UnauthorizedException if no devfile found and no authorization', async () => {
-      // All attempts fail with 404 (treated as private repo)
+    it('should return basic factory when no devfile found (404) without authorization', async () => {
+      // All attempts fail with 404 - for public repos, this means no devfile exists
+      // We should return a basic factory, not throw auth error
       (axiosInstanceNoCert.get as jest.Mock).mockResolvedValue({
         status: 404,
         statusText: 'Not Found',
@@ -413,9 +414,12 @@ describe('ScmRepositoryFactoryResolver', () => {
         [FACTORY_CONSTANTS.URL_PARAMETER_NAME]: 'https://github.com/user/repo',
       };
 
-      await expect(resolver.createFactory(parameters)).rejects.toThrow(
-        'SCM Authentication required',
-      );
+      const factory = (await resolver.createFactory(parameters)) as FactoryDevfileV2;
+      
+      // Should return basic factory with empty devfile structure
+      expect(factory.source).toBe('repo');
+      expect(factory.devfile.schemaVersion).toBe('2.3.0');
+      expect(factory.scm_info?.clone_url).toBe('https://github.com/user/repo');
     });
 
     it('should extract repository name correctly', async () => {
