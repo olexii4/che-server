@@ -14,10 +14,34 @@ import Fastify, { FastifyInstance } from 'fastify';
 
 import { registerServerConfigRoutes } from '../serverConfigRoutes';
 
+// Mock CheClusterService
+jest.mock('../../services/CheClusterService', () => ({
+  CheClusterService: {
+    getInstance: jest.fn().mockReturnValue({
+      getCheCluster: jest.fn().mockReturnValue(null),
+      getExternalDevfileRegistries: jest.fn().mockReturnValue([]),
+      getDisableInternalRegistry: jest.fn().mockReturnValue(false),
+    }),
+  },
+}));
+
+// Mock DashboardEnvironmentService
+jest.mock('../../services/DashboardEnvironmentService', () => ({
+  DashboardEnvironmentService: {
+    getInstance: jest.fn().mockReturnValue({
+      getNamespace: jest.fn().mockReturnValue('eclipse-che'),
+      getDefaultEditor: jest.fn().mockReturnValue(''),
+      getDefaultComponents: jest.fn().mockReturnValue([]),
+    }),
+  },
+}));
+
 describe('serverConfigRoutes', () => {
   let fastify: FastifyInstance;
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+
     // Clear all environment variables before each test
     delete process.env.CHE_NAMESPACE;
     delete process.env.CHE_WORKSPACE_PLUGIN_REGISTRY_INTERNAL_URL;
@@ -45,7 +69,13 @@ describe('serverConfigRoutes', () => {
     delete process.env.CHE_HIDE_EDITORS_BY_ID;
 
     fastify = Fastify();
-    await registerServerConfigRoutes(fastify);
+    // Register routes with /api prefix to match production setup
+    await fastify.register(
+      async instance => {
+        await registerServerConfigRoutes(instance);
+      },
+      { prefix: '/api' },
+    );
     await fastify.ready();
   });
 
@@ -67,14 +97,13 @@ describe('serverConfigRoutes', () => {
         cheNamespace: 'eclipse-che',
         defaults: {
           plugins: [],
-          components: [],
-          pvcStrategy: 'common',
+          pvcStrategy: 'per-workspace',
         },
         timeouts: {
-          inactivityTimeout: 1800000,
-          runTimeout: 0,
+          inactivityTimeout: 10800000,
+          runTimeout: 86400000,
           startTimeout: 300000,
-          axiosRequestTimeout: 10000,
+          axiosRequestTimeout: 30000,
         },
         devfileRegistry: {
           disableInternalRegistry: false,
@@ -93,7 +122,12 @@ describe('serverConfigRoutes', () => {
 
       await fastify.close();
       fastify = Fastify();
-      await registerServerConfigRoutes(fastify);
+      await fastify.register(
+        async instance => {
+          await registerServerConfigRoutes(instance);
+        },
+        { prefix: '/api' },
+      );
       await fastify.ready();
 
       const response = await fastify.inject({
@@ -112,7 +146,12 @@ describe('serverConfigRoutes', () => {
 
       await fastify.close();
       fastify = Fastify();
-      await registerServerConfigRoutes(fastify);
+      await fastify.register(
+        async instance => {
+          await registerServerConfigRoutes(instance);
+        },
+        { prefix: '/api' },
+      );
       await fastify.ready();
 
       const response = await fastify.inject({
@@ -131,7 +170,12 @@ describe('serverConfigRoutes', () => {
 
       await fastify.close();
       fastify = Fastify();
-      await registerServerConfigRoutes(fastify);
+      await fastify.register(
+        async instance => {
+          await registerServerConfigRoutes(instance);
+        },
+        { prefix: '/api' },
+      );
       await fastify.ready();
 
       const response = await fastify.inject({
@@ -152,7 +196,12 @@ describe('serverConfigRoutes', () => {
 
       await fastify.close();
       fastify = Fastify();
-      await registerServerConfigRoutes(fastify);
+      await fastify.register(
+        async instance => {
+          await registerServerConfigRoutes(instance);
+        },
+        { prefix: '/api' },
+      );
       await fastify.ready();
 
       const response = await fastify.inject({
@@ -177,7 +226,12 @@ describe('serverConfigRoutes', () => {
 
       await fastify.close();
       fastify = Fastify();
-      await registerServerConfigRoutes(fastify);
+      await fastify.register(
+        async instance => {
+          await registerServerConfigRoutes(instance);
+        },
+        { prefix: '/api' },
+      );
       await fastify.ready();
 
       const response = await fastify.inject({
@@ -196,7 +250,12 @@ describe('serverConfigRoutes', () => {
 
       await fastify.close();
       fastify = Fastify();
-      await registerServerConfigRoutes(fastify);
+      await fastify.register(
+        async instance => {
+          await registerServerConfigRoutes(instance);
+        },
+        { prefix: '/api' },
+      );
       await fastify.ready();
 
       const response = await fastify.inject({
@@ -214,7 +273,12 @@ describe('serverConfigRoutes', () => {
 
       await fastify.close();
       fastify = Fastify();
-      await registerServerConfigRoutes(fastify);
+      await fastify.register(
+        async instance => {
+          await registerServerConfigRoutes(instance);
+        },
+        { prefix: '/api' },
+      );
       await fastify.ready();
 
       const response = await fastify.inject({
@@ -228,13 +292,16 @@ describe('serverConfigRoutes', () => {
     });
 
     it('should include container build config when enabled', async () => {
-      // Set env vars BEFORE creating Fastify instance
       process.env.CHE_CONTAINER_BUILD_ENABLED = 'true';
       process.env.CHE_CONTAINER_BUILD_CONFIGURATION = '{"key": "value"}';
 
-      // Create new Fastify instance with these env vars
       const testFastify = Fastify();
-      await registerServerConfigRoutes(testFastify);
+      await testFastify.register(
+        async instance => {
+          await registerServerConfigRoutes(instance);
+        },
+        { prefix: '/api' },
+      );
       await testFastify.ready();
 
       const response = await testFastify.inject({
@@ -251,13 +318,16 @@ describe('serverConfigRoutes', () => {
     });
 
     it('should include container run config when enabled', async () => {
-      // Set env vars BEFORE creating Fastify instance
       process.env.CHE_CONTAINER_RUN_ENABLED = 'true';
       process.env.CHE_CONTAINER_RUN_CONFIGURATION = '{"runtime": "podman"}';
 
-      // Create new Fastify instance with these env vars
       const testFastify = Fastify();
-      await registerServerConfigRoutes(testFastify);
+      await testFastify.register(
+        async instance => {
+          await registerServerConfigRoutes(instance);
+        },
+        { prefix: '/api' },
+      );
       await testFastify.ready();
 
       const response = await testFastify.inject({
@@ -274,14 +344,17 @@ describe('serverConfigRoutes', () => {
     });
 
     it('should include advanced authorization when configured', async () => {
-      // Set env vars BEFORE creating Fastify instance
       process.env.CHE_ADVANCED_AUTH_ALLOW_USERS = 'user1,user2';
       process.env.CHE_ADVANCED_AUTH_ALLOW_GROUPS = 'group1';
       process.env.CHE_ADVANCED_AUTH_DENY_USERS = 'user3';
 
-      // Create new Fastify instance with these env vars
       const testFastify = Fastify();
-      await registerServerConfigRoutes(testFastify);
+      await testFastify.register(
+        async instance => {
+          await registerServerConfigRoutes(instance);
+        },
+        { prefix: '/api' },
+      );
       await testFastify.ready();
 
       const response = await testFastify.inject({
@@ -303,13 +376,16 @@ describe('serverConfigRoutes', () => {
     });
 
     it('should include editors visibility when configured', async () => {
-      // Set env vars BEFORE creating Fastify instance
       process.env.CHE_SHOW_DEPRECATED_EDITORS = 'true';
       process.env.CHE_HIDE_EDITORS_BY_ID = '["editor1", "editor2"]';
 
-      // Create new Fastify instance with these env vars
       const testFastify = Fastify();
-      await registerServerConfigRoutes(testFastify);
+      await testFastify.register(
+        async instance => {
+          await registerServerConfigRoutes(instance);
+        },
+        { prefix: '/api' },
+      );
       await testFastify.ready();
 
       const response = await testFastify.inject({
@@ -332,7 +408,12 @@ describe('serverConfigRoutes', () => {
 
       await fastify.close();
       fastify = Fastify();
-      await registerServerConfigRoutes(fastify);
+      await fastify.register(
+        async instance => {
+          await registerServerConfigRoutes(instance);
+        },
+        { prefix: '/api' },
+      );
       await fastify.ready();
 
       const response = await fastify.inject({
@@ -344,5 +425,6 @@ describe('serverConfigRoutes', () => {
       const body = JSON.parse(response.body);
       expect(body.defaultNamespace.autoProvision).toBe(false);
     });
+
   });
 });

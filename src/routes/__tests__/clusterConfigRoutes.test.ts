@@ -26,7 +26,13 @@ describe('clusterConfigRoutes', () => {
     delete process.env.CHE_CURRENT_ARCHITECTURE;
 
     fastify = Fastify();
-    await registerClusterConfigRoutes(fastify);
+    // Register routes with /api prefix to match production setup
+    await fastify.register(
+      async instance => {
+        await registerClusterConfigRoutes(instance);
+      },
+      { prefix: '/api' },
+    );
     await fastify.ready();
   });
 
@@ -57,7 +63,12 @@ describe('clusterConfigRoutes', () => {
       // Re-register routes to pick up new environment variables
       await fastify.close();
       fastify = Fastify();
-      await registerClusterConfigRoutes(fastify);
+      await fastify.register(
+        async instance => {
+          await registerClusterConfigRoutes(instance);
+        },
+        { prefix: '/api' },
+      );
       await fastify.ready();
 
       const response = await fastify.inject({
@@ -76,7 +87,12 @@ describe('clusterConfigRoutes', () => {
       // Re-register routes to pick up new environment variables
       await fastify.close();
       fastify = Fastify();
-      await registerClusterConfigRoutes(fastify);
+      await fastify.register(
+        async instance => {
+          await registerClusterConfigRoutes(instance);
+        },
+        { prefix: '/api' },
+      );
       await fastify.ready();
 
       const response = await fastify.inject({
@@ -96,7 +112,12 @@ describe('clusterConfigRoutes', () => {
       // Re-register routes to pick up new environment variables
       await fastify.close();
       fastify = Fastify();
-      await registerClusterConfigRoutes(fastify);
+      await fastify.register(
+        async instance => {
+          await registerClusterConfigRoutes(instance);
+        },
+        { prefix: '/api' },
+      );
       await fastify.ready();
 
       const response = await fastify.inject({
@@ -117,7 +138,12 @@ describe('clusterConfigRoutes', () => {
       // Re-register routes to pick up new environment variables
       await fastify.close();
       fastify = Fastify();
-      await registerClusterConfigRoutes(fastify);
+      await fastify.register(
+        async instance => {
+          await registerClusterConfigRoutes(instance);
+        },
+        { prefix: '/api' },
+      );
       await fastify.ready();
 
       const response = await fastify.inject({
@@ -137,7 +163,12 @@ describe('clusterConfigRoutes', () => {
       // Re-register routes to pick up new environment variables
       await fastify.close();
       fastify = Fastify();
-      await registerClusterConfigRoutes(fastify);
+      await fastify.register(
+        async instance => {
+          await registerClusterConfigRoutes(instance);
+        },
+        { prefix: '/api' },
+      );
       await fastify.ready();
 
       const response = await fastify.inject({
