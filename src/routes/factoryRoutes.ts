@@ -110,11 +110,12 @@ export async function registerFactoryRoutes(fastify: FastifyInstance): Promise<v
         // Get parameters from request body
         const parameters: FactoryResolverParams = (request.body as any) || {};
 
-        // Pass Authorization header for private repository access
-        const authorizationHeader = request.headers.authorization;
-        if (authorizationHeader) {
-          parameters.authorization = authorizationHeader;
-        }
+        // NOTE: We intentionally do NOT pass the OIDC authorization header to the factory resolver.
+        // The authorization header from the request contains the Che OIDC token (from Dex),
+        // which is NOT a valid GitHub/GitLab/Bitbucket token.
+        // For private repository access, users should configure Personal Access Tokens
+        // which are stored in Kubernetes secrets and looked up by the SCM resolvers.
+        // Forwarding the OIDC token to GitHub causes 404 errors for public repos.
 
         // Resolve factory
         const factory = await factoryService.resolveFactory(parameters);

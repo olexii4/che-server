@@ -169,20 +169,17 @@ The response includes Content-Disposition header to trigger file download in bro
           });
         }
 
-        // Pass Authorization header for private repository access
-        const authorizationHeader = request.headers.authorization;
+        // NOTE: We intentionally do NOT pass the OIDC authorization header to SCM resolvers.
+        // The authorization header from the request contains the Che OIDC token (from Dex),
+        // which is NOT a valid GitHub/GitLab/Bitbucket token.
+        // For private repository access, users should configure Personal Access Tokens
+        // which are stored in Kubernetes secrets and looked up by the SCM resolvers.
+        // Forwarding the OIDC token to GitHub causes 404 errors for public repos.
         logger.info(`[scmRoutes] Received request for repository: ${repository}, file: ${file}`);
-        logger.info(
-          `[scmRoutes] Authorization header present: ${authorizationHeader ? 'YES' : 'NO'}`,
-        );
-        if (authorizationHeader) {
-          logger.info(
-            `[scmRoutes] Authorization header value: ${authorizationHeader.substring(0, 20)}...`,
-          );
-        }
 
-        // Resolve file content (will use auth if provided, work without auth for public repos)
-        const content = await scmResolvers.resolveFile(repository, file, authorizationHeader);
+        // Resolve file content without OIDC auth (works for public repos)
+        // Private repos will require Personal Access Tokens configured in Che
+        const content = await scmResolvers.resolveFile(repository, file, undefined);
 
         // Extract filename from file path
         const filename = file.split('/').pop() || 'file';
