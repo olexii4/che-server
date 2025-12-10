@@ -12,6 +12,7 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
+import { KubeConfigProvider } from '../helpers/KubeConfigProvider';
 import { getKubeConfig } from '../helpers/getKubernetesClient';
 import { KubeConfigService } from '../services/KubeConfigService';
 import { logger } from '../utils/logger';
@@ -20,6 +21,11 @@ import { logger } from '../utils/logger';
  * Register KubeConfig injection routes
  *
  * These routes allow injecting kubeconfig into running DevWorkspace containers.
+ *
+ * NOTE: We use the ServiceAccount's KubeConfig for exec operations (to execute commands
+ * in pods), but inject a kubeconfig file containing the user's token into the containers.
+ * This is because the OIDC token from Dex may not be valid for direct Kubernetes API calls
+ * in clusters where the API server doesn't trust the OIDC provider.
  *
  * Matches dashboard-backend/src/routes/api/kubeConfig.ts
  */
@@ -74,11 +80,19 @@ export async function registerKubeConfigRoutes(fastify: FastifyInstance): Promis
       reply: FastifyReply,
     ) => {
       const { namespace, devworkspaceId } = request.params;
-      const token = request.subject!.token;
+      const userToken = request.subject!.token;
 
       try {
-        const kubeConfig = getKubeConfig(token);
-        const service = new KubeConfigService(kubeConfig);
+        // Use ServiceAccount's KubeConfig for exec operations (to run commands in pods)
+        // This works because the ServiceAccount has permissions to exec into pods
+        const kubeConfigProvider = new KubeConfigProvider();
+        const execKubeConfig = kubeConfigProvider.getServiceAccountKubeConfig();
+
+        // Create user's KubeConfig to inject into the container (for user's access)
+        const userKubeConfig = getKubeConfig(userToken);
+
+        // Create service with both configs: exec with SA, inject user's config
+        const service = new KubeConfigService(execKubeConfig, userKubeConfig);
         await service.injectKubeConfig(namespace, devworkspaceId);
 
         return reply.code(204).send();

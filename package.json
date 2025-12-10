@@ -12,6 +12,7 @@
     "start:debug": "nodemon --inspect --no-deprecation dist/index.js",
     "dev": "lsof -ti tcp:8080 | xargs kill && yarn build:dev && yarn start:debug",
     "patch": "$PWD/run/patch.sh",
+    "deploy:openshift": "$PWD/run/deploy-openshift.sh",
     "format:check": "prettier --config .prettierrc --check src/",
     "format:fix": "prettier --config .prettierrc --write src/",
     "lint:check": "tsc --noEmit && eslint '*/**/*.{js,ts,tsx}'",

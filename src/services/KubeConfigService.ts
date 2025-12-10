@@ -36,6 +36,16 @@ interface ServerConfig {
  *
  * This feature injects kubeconfig into running DevWorkspace pods.
  *
+ * The service uses two KubeConfigs:
+ * 1. execKubeConfig - Used for exec operations (running commands in pods).
+ *    This is typically the ServiceAccount's KubeConfig with permissions to exec.
+ * 2. userKubeConfig - The kubeconfig content to inject into containers.
+ *    This contains the user's token for their access.
+ *
+ * This separation is needed because in clusters where the Kubernetes API server
+ * doesn't trust the OIDC provider (e.g., Dex), the user's OIDC token cannot be
+ * used directly for Kubernetes API calls. The ServiceAccount token is used instead.
+ *
  * Matches dashboard-backend/src/devworkspaceClient/services/kubeConfigApi.ts
  */
 export class KubeConfigService {
@@ -43,15 +53,31 @@ export class KubeConfigService {
   private kubeConfigYaml: string;
   private serverConfig: ServerConfig;
 
-  constructor(kubeConfig: k8s.KubeConfig) {
-    this.coreV1Api = kubeConfig.makeApiClient(k8s.CoreV1Api);
-    this.kubeConfigYaml = kubeConfig.exportConfig();
+  /**
+   * Create KubeConfigService
+   *
+   * @param execKubeConfig - KubeConfig for exec operations (ServiceAccount's config)
+   * @param userKubeConfig - Optional KubeConfig to inject into containers (user's config).
+   *                         If not provided, execKubeConfig is used for both.
+   */
+  constructor(execKubeConfig: k8s.KubeConfig, userKubeConfig?: k8s.KubeConfig) {
+    // Use execKubeConfig for API calls and exec operations
+    this.coreV1Api = execKubeConfig.makeApiClient(k8s.CoreV1Api);
 
-    const server = kubeConfig.getCurrentCluster()?.server || '';
+    // Use userKubeConfig for the content to inject, fallback to execKubeConfig
+    const configToInject = userKubeConfig || execKubeConfig;
+    this.kubeConfigYaml = configToInject.exportConfig();
+
+    // Server config for WebSocket exec uses the execKubeConfig
+    const server = execKubeConfig.getCurrentCluster()?.server || '';
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const opts: any = {};
-    kubeConfig.applyToRequest(opts);
+    execKubeConfig.applyToRequest(opts);
     this.serverConfig = { opts, server };
+
+    logger.info(
+      `[KubeConfigService] Initialized with exec server: ${server}, inject config cluster: ${configToInject.getCurrentCluster()?.server}`,
+    );
   }
 
   /**
@@ -178,47 +204,62 @@ export class KubeConfigService {
     namespace: string,
     containerName: string,
   ): Promise<string> {
+    logger.info(
+      `[KubeConfigService] Resolving kubeconfig directory for ${namespace}/${name}/${containerName}`,
+    );
+
     try {
       // Attempt to resolve the KUBECONFIG env variable
+      logger.info(`[KubeConfigService] Trying printenv KUBECONFIG...`);
       const kubeConfigEnvResult = await this.exec(name, namespace, containerName, [
         'sh',
         '-c',
         'printenv KUBECONFIG',
       ]);
 
+      logger.info(
+        `[KubeConfigService] KUBECONFIG result: stdOut="${kubeConfigEnvResult.stdOut}", stdError="${kubeConfigEnvResult.stdError}"`,
+      );
+
       if (kubeConfigEnvResult.stdOut) {
-        return kubeConfigEnvResult.stdOut.replace(/\/config$/, '');
+        const dir = kubeConfigEnvResult.stdOut.replace(/\/config$/, '');
+        logger.info(`[KubeConfigService] Using KUBECONFIG directory: ${dir}`);
+        return dir;
       }
     } catch (e) {
-      logger.debug(
+      logger.warn(
         { error: e },
-        `Failed to run "printenv KUBECONFIG" in "${namespace}/${name}/${containerName}"`,
+        `[KubeConfigService] Failed to run "printenv KUBECONFIG" in "${namespace}/${name}/${containerName}"`,
       );
     }
 
     try {
       // Attempt to resolve the HOME directory
+      logger.info(`[KubeConfigService] Trying printenv HOME...`);
       const homeEnvResult = await this.exec(name, namespace, containerName, [
         'sh',
         '-c',
         'printenv HOME',
       ]);
 
+      logger.info(
+        `[KubeConfigService] HOME result: stdOut="${homeEnvResult.stdOut}", stdError="${homeEnvResult.stdError}"`,
+      );
+
       if (homeEnvResult.stdOut) {
         const home = homeEnvResult.stdOut;
-        if (home.endsWith('/')) {
-          return home + '.kube';
-        } else {
-          return home + '/.kube';
-        }
+        const dir = home.endsWith('/') ? home + '.kube' : home + '/.kube';
+        logger.info(`[KubeConfigService] Using HOME-based directory: ${dir}`);
+        return dir;
       }
     } catch (e) {
-      logger.debug(
+      logger.warn(
         { error: e },
-        `Failed to run "printenv HOME" in "${namespace}/${name}/${containerName}"`,
+        `[KubeConfigService] Failed to run "printenv HOME" in "${namespace}/${name}/${containerName}"`,
       );
     }
 
+    logger.warn(`[KubeConfigService] Could not resolve kubeconfig directory`);
     return '';
   }
 
@@ -307,6 +348,13 @@ export class KubeConfigService {
     let stdError = '';
     const { server, opts } = this.serverConfig;
 
+    logger.info(`[KubeConfigService.exec] Executing command in ${namespace}/${pod}/${container}`);
+    logger.info(`[KubeConfigService.exec] Command: ${command.join(' ')}`);
+    logger.info(`[KubeConfigService.exec] Server: ${server}`);
+    logger.info(
+      `[KubeConfigService.exec] Opts keys: ${Object.keys(opts as Record<string, unknown>).join(', ')}`,
+    );
+
     try {
       await new Promise<void>((resolve, reject) => {
         const k8sServer = server.replace(/^http/, 'ws');
@@ -324,13 +372,16 @@ export class KubeConfigService {
         }
 
         const url = `${k8sServer}/api/v1/namespaces/${namespace}/pods/${pod}/exec?${queryParams.toString()}`;
+        logger.info(`[KubeConfigService.exec] WebSocket URL: ${url.substring(0, 100)}...`);
 
         const client = new WebSocket(url, PROTOCOLS, opts as WebSocket.ClientOptions);
         let openTimeoutObj: NodeJS.Timeout | undefined;
         let responseTimeoutObj: NodeJS.Timeout | undefined;
 
         client.onopen = () => {
+          logger.info(`[KubeConfigService.exec] WebSocket connected`);
           openTimeoutObj = setTimeout(() => {
+            logger.warn(`[KubeConfigService.exec] WebSocket open timeout, closing`);
             if (client.readyState === WebSocket.OPEN) {
               client.close();
             }
@@ -338,6 +389,9 @@ export class KubeConfigService {
         };
 
         client.onclose = () => {
+          logger.info(
+            `[KubeConfigService.exec] WebSocket closed. stdOut="${stdOut}", stdError="${stdError}"`,
+          );
           resolve();
           if (openTimeoutObj) {
             clearTimeout(openTimeoutObj);
@@ -349,6 +403,7 @@ export class KubeConfigService {
 
         client.onerror = err => {
           const message = err.message || 'WebSocket error';
+          logger.error(`[KubeConfigService.exec] WebSocket error: ${message}`);
           stdError += message;
           reject(new Error(message));
           client.close();

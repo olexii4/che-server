@@ -99,7 +99,7 @@ export class KubeConfigProvider {
     const context: k8s.Context = {
       user: user.name,
       cluster: currentContext.cluster,
-      name: 'request-user-context',
+      name: 'logged-user',
       namespace: currentContext.namespace, // Preserve namespace if set
     };
 

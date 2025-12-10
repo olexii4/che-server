@@ -8,30 +8,55 @@
 # Contributors:
 #   Red Hat, Inc. - initial API and implementation
 
-FROM docker.io/node:20.18.0-alpine3.20 AS builder
+# ============================================
+# Builder stage
+# ============================================
+FROM registry.redhat.io/ubi9/nodejs-20-minimal:9.6-1755755732 AS builder
 
-RUN apk add --no-cache python3 make g++
+USER 0
+
+# Install build dependencies
+RUN microdnf update -y && \
+    microdnf install -y jq && \
+    microdnf clean all
+
+WORKDIR /che-server
 
 # Copy Yarn configuration
 COPY .yarn/releases /che-server/.yarn/releases/
 COPY .yarnrc.yml /che-server/.yarnrc.yml
+
+# Link yarn to /usr/bin/yarn
+RUN ln -s /che-server/.yarn/releases/yarn-*.cjs /usr/bin/yarn
+
+# Copy package files for dependency installation
 COPY package.json /che-server/
 COPY yarn.lock /che-server/
 COPY tsconfig.json /che-server/
 
-WORKDIR /che-server
+# Install dependencies
 RUN yarn install --network-timeout 3600000
 
+# Copy source and build config
 COPY src /che-server/src
 COPY webpack.config.common.js /che-server/
 COPY webpack.config.prod.js /che-server/
 COPY webpack.config.dev.js /che-server/
+
+# Build with webpack (production mode)
 RUN yarn build
 
+# ============================================
 # Production image
-FROM docker.io/node:20.18.0-alpine3.20
+# ============================================
+FROM registry.redhat.io/ubi9/nodejs-20-minimal:9.6-1755755732
 
-RUN apk add --no-cache curl shadow
+USER 0
+
+# Install runtime dependencies
+RUN microdnf update -y && \
+    microdnf install -y shadow-utils && \
+    microdnf clean all
 
 ENV CHE_HOME=/home/user/che-server
 
@@ -43,17 +68,22 @@ COPY --from=builder /che-server/package.json ${CHE_HOME}/
 # Copy entrypoint script
 COPY build/dockerfiles/entrypoint.sh /entrypoint.sh
 
+# Copy LICENSE to /licenses for ecosystem certification checks
+RUN mkdir -p /licenses
+COPY LICENSE /licenses/LICENSE
+
 # Create user and directories with proper permissions
-RUN addgroup -g 1001 user && \
-    adduser -u 1001 -G user -D user && \
-    chown -R user:user ${CHE_HOME} && \
+RUN useradd -u 1001 -g 0 -d /home/user -m user && \
+    chown -R 1001:0 ${CHE_HOME} && \
     chmod -R g+rwX ${CHE_HOME} && \
     chmod +x /entrypoint.sh
 
-USER user
+USER 1001
 
 EXPOSE 8080
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["sh"]
 
+LABEL io.openshift.expose-services="8080:http" \
+      usage="Eclipse Che Server - TypeScript Implementation"
