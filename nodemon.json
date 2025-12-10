@@ -1,0 +1,16 @@
+{
+  "watch": ["dist"],
+  "ext": "js,json,yaml",
+  "ignore": ["node_modules/", "src/", "tests/", "*.test.js", "**/*.test.js"],
+  "delay": 3000,
+  "verbose": false,
+  "execMap": {
+    "js": "node --no-deprecation"
+  },
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "signal": "SIGTERM",
+  "restartable": "rs"
+}
+
