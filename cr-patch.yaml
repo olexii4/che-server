@@ -1,0 +1,30 @@
+# Kubernetes CheCluster patch for Eclipse Che Server (TypeScript)
+#
+# Usage with chectl:
+#   chectl server:deploy --platform=minikube --che-operator-cr-patch-yaml=$(PWD)/cr-patch.yaml
+#   chectl server:update --che-operator-cr-patch-yaml=$(PWD)/cr-patch.yaml
+#
+# Usage with kubectl (recommended for custom images):
+#   export IMAGE_REGISTRY_HOST=docker.io
+#   export IMAGE_REGISTRY_USER_NAME=your-username
+#   export IMAGE_TAG=next
+#   envsubst < cr-patch.yaml | kubectl apply -n eclipse-che -f -
+#
+# Or use the patch script:
+#   export IMAGE_REGISTRY_HOST=docker.io
+#   export IMAGE_REGISTRY_USER_NAME=your-username
+#   ./run/patch.sh
+#
+# Default image (when not using envsubst):
+#   docker.io/olexii4dockerid/che-server:next
+#
+kind: CheCluster
+apiVersion: org.eclipse.che/v2
+spec:
+  components:
+    cheServer:
+      deployment:
+        containers:
+          - image: '${IMAGE_REGISTRY_HOST:-docker.io}/${IMAGE_REGISTRY_USER_NAME:-olexii4dockerid}/che-server:${IMAGE_TAG:-next}'
+            imagePullPolicy: Always
+            name: che-server
