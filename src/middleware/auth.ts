@@ -77,7 +77,7 @@ function decodeJwtPayload(token: string): any {
  */
 async function getUsernameFromK8sToken(token: string): Promise<string | null> {
   let timeoutId: NodeJS.Timeout | undefined;
-  
+
   try {
     // Add timeout to prevent hanging
     const timeoutPromise = new Promise<null>(resolve => {
@@ -135,7 +135,7 @@ async function getUsernameFromK8sToken(token: string): Promise<string | null> {
 
     // Race between TokenReview and timeout
     const result = await Promise.race([tokenReviewPromise, timeoutPromise]);
-    
+
     return result;
   } catch (error: any) {
     logger.error({ error: error.message }, 'Failed to validate token with TokenReview API');

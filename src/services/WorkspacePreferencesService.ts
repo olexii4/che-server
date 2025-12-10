@@ -39,6 +39,9 @@ export class WorkspacePreferencesService {
 
   /**
    * Get workspace preferences
+   * 
+   * If the ConfigMap doesn't exist, it will be created automatically
+   * (matching Java PreferencesConfigMapConfigurator behavior)
    */
   async getWorkspacePreferences(namespace: string): Promise<WorkspacePreferences> {
     try {
@@ -73,9 +76,11 @@ export class WorkspacePreferencesService {
 
       return preferences;
     } catch (error: any) {
-      // If ConfigMap doesn't exist, return empty preferences with proper structure
+      // If ConfigMap doesn't exist, create it and return defaults
+      // This matches Java PreferencesConfigMapConfigurator behavior
       if (error.statusCode === 404 || error.response?.statusCode === 404) {
-        logger.info({ namespace }, 'Workspace preferences ConfigMap not found, returning defaults');
+        logger.info({ namespace }, 'Workspace preferences ConfigMap not found, creating it');
+        await this.ensureConfigMapExists(namespace);
         return {
           'skip-authorisation': [],
           'trusted-sources': [],
@@ -83,6 +88,53 @@ export class WorkspacePreferencesService {
       }
       logger.error({ error, namespace }, 'Error getting workspace preferences');
       throw error;
+    }
+  }
+
+  /**
+   * Ensure the workspace-preferences-configmap exists
+   * Creates it if it doesn't exist (matches Java PreferencesConfigMapConfigurator)
+   */
+  async ensureConfigMapExists(namespace: string): Promise<void> {
+    try {
+      // Check if ConfigMap exists
+      await this.coreV1Api.readNamespacedConfigMap(
+        DEV_WORKSPACE_PREFERENCES_CONFIGMAP,
+        namespace,
+      );
+      logger.debug({ namespace }, 'Workspace preferences ConfigMap already exists');
+    } catch (error: any) {
+      if (error.statusCode === 404 || error.response?.statusCode === 404) {
+        // Create the ConfigMap
+        logger.info({ namespace }, 'Creating workspace preferences ConfigMap');
+        try {
+          const configMap: k8s.V1ConfigMap = {
+            apiVersion: 'v1',
+            kind: 'ConfigMap',
+            metadata: {
+              name: DEV_WORKSPACE_PREFERENCES_CONFIGMAP,
+              namespace: namespace,
+              labels: {
+                'app.kubernetes.io/part-of': 'che.eclipse.org',
+                'app.kubernetes.io/component': 'workspace-preferences',
+              },
+            },
+            data: {
+              [SKIP_AUTHORIZATION_KEY]: '[]',
+            },
+          };
+          await this.coreV1Api.createNamespacedConfigMap(namespace, configMap);
+          logger.info({ namespace }, 'Workspace preferences ConfigMap created');
+        } catch (createError: any) {
+          // If it already exists (race condition), that's fine
+          if (createError.statusCode !== 409 && createError.response?.statusCode !== 409) {
+            logger.error({ error: createError, namespace }, 'Error creating preferences ConfigMap');
+            throw createError;
+          }
+        }
+      } else {
+        throw error;
+      }
     }
   }
 

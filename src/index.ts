@@ -34,6 +34,7 @@ import { registerPersonalAccessTokenRoutes } from './routes/personalAccessTokenR
 import { registerGitConfigRoutes } from './routes/gitConfigRoutes';
 import { registerDockerConfigRoutes } from './routes/dockerConfigRoutes';
 import { registerWorkspacePreferencesRoutes } from './routes/workspacePreferencesRoutes';
+import { registerKubeConfigRoutes } from './routes/kubeConfigRoutes';
 import { registerGettingStartedSampleRoutes } from './routes/gettingStartedSampleRoutes';
 import { registerAirGapSampleRoutes } from './routes/airgapSampleRoutes';
 import { registerSystemRoutes } from './routes/systemRoutes';
@@ -196,6 +197,7 @@ async function start() {
         await registerGitConfigRoutes(apiInstance);
         await registerDockerConfigRoutes(apiInstance);
         await registerWorkspacePreferencesRoutes(apiInstance);
+        await registerKubeConfigRoutes(apiInstance);
         await registerGettingStartedSampleRoutes(apiInstance);
         await registerAirGapSampleRoutes(apiInstance);
         await registerSystemRoutes(apiInstance);
@@ -241,7 +243,7 @@ async function start() {
 
     logger.info(`Che Server swagger is running on "http://localhost:${PORT}/swagger".`);
     logger.info(`\n🚀 Eclipse Che Next API Server (Fastify) is running on port ${PORT}`);
-    
+
     // Initialize CheClusterService AFTER server starts (async, non-blocking)
     // This allows health checks to succeed while we load the CheCluster CR in the background
     setTimeout(async () => {
@@ -250,7 +252,10 @@ async function start() {
         await cheClusterService.initialize();
         logger.info('CheClusterService initialized successfully');
       } catch (error) {
-        logger.warn({ error }, 'Failed to initialize CheClusterService, will use fallback configuration from environment variables');
+        logger.warn(
+          { error },
+          'Failed to initialize CheClusterService, will use fallback configuration from environment variables',
+        );
       }
     }, 100); // Small delay to ensure server is fully ready
     logger.info(`\n📚 API Documentation:`);
@@ -369,13 +374,13 @@ process.on('uncaughtException', err => {
     },
     'Uncaught exception - DETAILED',
   );
-  
+
   // Don't shutdown on empty errors - they're likely handled elsewhere
   if (!err || (typeof err === 'object' && Object.keys(err).length === 0)) {
     logger.warn('Ignoring uncaught exception with empty error object');
     return;
   }
-  
+
   shutdown('uncaughtException');
 });
 
@@ -390,13 +395,13 @@ process.on('unhandledRejection', (reason, promise) => {
     },
     'Unhandled rejection - DETAILED',
   );
-  
+
   // Don't shutdown on empty rejections
   if (!reason || (typeof reason === 'object' && Object.keys(reason).length === 0)) {
     logger.warn('Ignoring unhandled rejection with empty reason');
     return;
   }
-  
+
   shutdown('unhandledRejection');
 });
 
