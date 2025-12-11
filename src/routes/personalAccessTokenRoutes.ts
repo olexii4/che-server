@@ -12,7 +12,7 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
-import { getKubeConfig } from '../helpers/getKubernetesClient';
+import { getServiceAccountKubeConfig } from '../helpers/getKubernetesClient';
 import { PersonalAccessToken } from '../models/CredentialsModels';
 import { PersonalAccessTokenService } from '../services/PersonalAccessTokenService';
 
@@ -66,7 +66,8 @@ export async function registerPersonalAccessTokenRoutes(fastify: FastifyInstance
         }
 
         const { namespace } = request.params;
-        const kubeConfig = getKubeConfig(request.subject.token);
+        // Use ServiceAccount for elevated permissions to manage secrets
+        const kubeConfig = getServiceAccountKubeConfig();
         const service = new PersonalAccessTokenService(kubeConfig);
 
         const tokens = await service.listInNamespace(namespace);
@@ -137,7 +138,8 @@ export async function registerPersonalAccessTokenRoutes(fastify: FastifyInstance
 
         const { namespace } = request.params;
         const token = request.body;
-        const kubeConfig = getKubeConfig(request.subject.token);
+        // Use ServiceAccount for elevated permissions to manage secrets
+        const kubeConfig = getServiceAccountKubeConfig();
         const service = new PersonalAccessTokenService(kubeConfig);
 
         const created = await service.create(namespace, token);
@@ -205,7 +207,8 @@ export async function registerPersonalAccessTokenRoutes(fastify: FastifyInstance
 
         const { namespace } = request.params;
         const token = request.body;
-        const kubeConfig = getKubeConfig(request.subject.token);
+        // Use ServiceAccount for elevated permissions to manage secrets
+        const kubeConfig = getServiceAccountKubeConfig();
         const service = new PersonalAccessTokenService(kubeConfig);
 
         const updated = await service.replace(namespace, token);
@@ -257,7 +260,8 @@ export async function registerPersonalAccessTokenRoutes(fastify: FastifyInstance
         }
 
         const { namespace, tokenName } = request.params;
-        const kubeConfig = getKubeConfig(request.subject.token);
+        // Use ServiceAccount for elevated permissions to manage secrets
+        const kubeConfig = getServiceAccountKubeConfig();
         const service = new PersonalAccessTokenService(kubeConfig);
 
         await service.delete(namespace, tokenName);

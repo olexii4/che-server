@@ -215,7 +215,7 @@ export class GithubApiClient implements ScmApiClient {
    * Build OAuth authentication URL for GitHub
    */
   private buildOAuthUrl(): string {
-    const apiEndpoint = process.env.CHE_API_ENDPOINT || 'http://localhost:8080';
+    const apiEndpoint = process.env.CHE_API || process.env.CHE_API_ENDPOINT || 'http://localhost:8080';
     return `${apiEndpoint}/oauth/authenticate?oauth_provider=github&scope=repo&request_method=POST&signature_method=rsa`;
   }
 

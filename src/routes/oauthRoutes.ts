@@ -12,6 +12,9 @@
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { OAuthService } from '../services/OAuthService';
+import { PersonalAccessTokenService } from '../services/PersonalAccessTokenService';
+import { getServiceAccountKubeConfig } from '../helpers/getKubernetesClient';
+import { GitProvider } from '../models/CredentialsModels';
 
 /**
  * Register OAuth routes
@@ -353,6 +356,7 @@ export async function registerOAuthRoutes(fastify: FastifyInstance): Promise<voi
         summary: 'Initiate OAuth authentication',
         description:
           'Redirects to OAuth provider for authentication. This endpoint initiates the OAuth flow.',
+        security: [{ BearerAuth: [] }, { BasicAuth: [] }],
         querystring: {
           type: 'object',
           required: ['oauth_provider'],
@@ -403,6 +407,8 @@ export async function registerOAuthRoutes(fastify: FastifyInstance): Promise<voi
           },
         },
       },
+      // Authenticate user to get their identity for the OAuth state
+      onRequest: [fastify.authenticate],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
@@ -435,18 +441,42 @@ export async function registerOAuthRoutes(fastify: FastifyInstance): Promise<voi
         }
 
         // Build redirect URL to OAuth provider
-        const redirectUri = `${process.env.CHE_API_ENDPOINT || `http://localhost:${process.env.PORT || 8080}`}/api/oauth/callback`;
+        // Use CHE_API or CHE_API_ENDPOINT, remove trailing /api to avoid /api/api duplication
+        let baseUrl =
+          process.env.CHE_API ||
+          process.env.CHE_API_ENDPOINT ||
+          `http://localhost:${process.env.PORT || 8080}`;
+        if (baseUrl.endsWith('/api')) {
+          baseUrl = baseUrl.slice(0, -4);
+        }
+        const redirectUri = `${baseUrl}/api/oauth/callback`;
 
-        // Build state parameter (contains redirect_after_login)
-        const state = redirect_after_login
-          ? Buffer.from(JSON.stringify({ redirect_after_login })).toString('base64')
-          : '';
+        // Build state parameter (contains redirect_after_login AND user info for callback)
+        // The callback bypasses Dex auth, so we need to pass user context in the state
+        const userId = request.subject?.userId || 'anonymous';
+        const userName = request.subject?.userName || 'anonymous';
+        const namespace = `${userName}-che`;
 
-        const authUrl = new URL(authenticator.endpointUrl);
-        authUrl.searchParams.set(
-          'client_id',
-          process.env[`${oauth_provider.toUpperCase()}_CLIENT_ID`] || 'che-client',
-        );
+        const stateData = {
+          redirect_after_login: redirect_after_login || '/',
+          oauth_provider: oauth_provider,
+          userId,
+          userName,
+          namespace,
+        };
+        const state = Buffer.from(JSON.stringify(stateData)).toString('base64');
+
+        // Use authorizationEndpoint (full URL like https://github.com/login/oauth/authorize)
+        // Fall back to endpointUrl if authorizationEndpoint is not available
+        const authEndpoint = authenticator.authorizationEndpoint || authenticator.endpointUrl;
+        const authUrl = new URL(authEndpoint);
+
+        // Use clientId from OAuth configuration (loaded from Kubernetes secret)
+        const clientId =
+          authenticator.clientId ||
+          process.env[`${oauth_provider.toUpperCase()}_CLIENT_ID`] ||
+          'che-client';
+        authUrl.searchParams.set('client_id', clientId);
         authUrl.searchParams.set('redirect_uri', redirectUri);
         if (scope) {
           authUrl.searchParams.set('scope', scope);
@@ -567,47 +597,167 @@ export async function registerOAuthRoutes(fastify: FastifyInstance): Promise<voi
           });
         }
 
-        // TODO: Exchange authorization code for access token
-        // This requires implementing token exchange with each OAuth provider
-        // For now, return a success page
-
-        // Decode state to get redirect URL
+        // Decode state to get redirect URL, OAuth provider info, AND user context
         let redirectUrl = '/';
+        let oauthProvider = 'github'; // Default, should come from state
+        let userId = 'anonymous';
+        let userName = 'anonymous';
+        let namespace = '';
+
         if (state) {
           try {
+            // Try base64 JSON format first
             const decoded = JSON.parse(Buffer.from(state, 'base64').toString());
             redirectUrl = decoded.redirect_after_login || '/';
-          } catch (err) {
-            fastify.log.warn({ err }, 'Failed to decode state parameter');
+            oauthProvider = decoded.oauth_provider || 'github';
+            userId = decoded.userId || 'anonymous';
+            userName = decoded.userName || 'anonymous';
+            namespace = decoded.namespace || `${userName}-che`;
+
+            fastify.log.info({ oauthProvider, userId, userName, namespace }, 'Decoded OAuth state');
+          } catch {
+            // Try URL-encoded format (used by dashboard)
+            try {
+              const params = new URLSearchParams(decodeURIComponent(state));
+              redirectUrl = params.get('redirect_after_login') || '/';
+              oauthProvider = params.get('oauth_provider') || 'github';
+            } catch (err) {
+              fastify.log.warn({ err }, 'Failed to decode state parameter');
+            }
+          }
+        }
+
+        // Exchange authorization code for access token
+        const authenticators = oauthService.getRegisteredAuthenticators();
+        const authenticator = authenticators.find(auth => auth.name === oauthProvider);
+
+        if (authenticator && authenticator.clientId) {
+          try {
+            // Get token endpoint
+            let tokenEndpoint = '';
+            if (oauthProvider === 'github') {
+              tokenEndpoint = 'https://github.com/login/oauth/access_token';
+            } else if (oauthProvider === 'gitlab') {
+              tokenEndpoint = 'https://gitlab.com/oauth/token';
+            } else if (oauthProvider === 'bitbucket') {
+              tokenEndpoint = 'https://bitbucket.org/site/oauth2/access_token';
+            }
+
+            if (tokenEndpoint) {
+              // Build redirect URI (same as used in /authenticate)
+              let baseUrl =
+                process.env.CHE_API ||
+                process.env.CHE_API_ENDPOINT ||
+                `http://localhost:${process.env.PORT || 8080}`;
+              if (baseUrl.endsWith('/api')) {
+                baseUrl = baseUrl.slice(0, -4);
+              }
+              const redirectUri = `${baseUrl}/api/oauth/callback`;
+
+              // Get client secret from OAuth configuration (loaded from Kubernetes secret)
+              const clientSecret =
+                authenticator.clientSecret ||
+                process.env[`${oauthProvider.toUpperCase()}_CLIENT_SECRET`];
+
+              // Exchange code for token
+              const tokenResponse = await fetch(tokenEndpoint, {
+                method: 'POST',
+                headers: {
+                  Accept: 'application/json',
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                  client_id: authenticator.clientId,
+                  client_secret: clientSecret || '',
+                  code: code,
+                  redirect_uri: redirectUri,
+                }),
+              });
+
+              const tokenData = await tokenResponse.json();
+              fastify.log.info(
+                { provider: oauthProvider, hasToken: !!tokenData.access_token },
+                'Token exchange completed',
+              );
+
+              if (tokenData.access_token) {
+                // Store token as a Personal Access Token (PAT) Kubernetes secret
+                // Use user info from OAuth state (since callback bypasses Dex auth)
+
+                if (userName !== 'anonymous' && namespace) {
+                  try {
+                    // Generate a random token name (5 chars like dogfooding does)
+                    const tokenName = Math.random().toString(36).substring(2, 7);
+
+                    // Get provider endpoint
+                    let gitProviderEndpoint = 'https://github.com';
+                    if (oauthProvider === 'gitlab') {
+                      gitProviderEndpoint = 'https://gitlab.com';
+                    } else if (oauthProvider === 'bitbucket') {
+                      gitProviderEndpoint = 'https://bitbucket.org';
+                    } else if (oauthProvider === 'azure-devops') {
+                      gitProviderEndpoint = 'https://dev.azure.com';
+                    }
+
+                    // Create PAT using ServiceAccount (has permission to create secrets)
+                    const kubeConfig = getServiceAccountKubeConfig();
+                    const patService = new PersonalAccessTokenService(kubeConfig);
+
+                    // Base64 encode the token
+                    const tokenDataBase64 = Buffer.from(tokenData.access_token).toString('base64');
+
+                    await patService.create(namespace, {
+                      tokenName,
+                      cheUserId: userId,
+                      gitProvider: oauthProvider as GitProvider,
+                      gitProviderEndpoint,
+                      isOauth: true,
+                      tokenData: tokenDataBase64,
+                    });
+
+                    fastify.log.info(
+                      { provider: oauthProvider, userId, namespace, tokenName },
+                      'OAuth token stored as PAT secret successfully',
+                    );
+                  } catch (patError: any) {
+                    fastify.log.error(
+                      { error: patError.message, namespace },
+                      'Failed to store OAuth token as PAT secret',
+                    );
+                  }
+                } else {
+                  // Fallback: store in memory if no namespace available
+                  await oauthService.storeToken(userId, oauthProvider, {
+                    token: tokenData.access_token,
+                    scope: tokenData.scope || '',
+                  });
+                  fastify.log.info(
+                    { provider: oauthProvider, userId },
+                    'OAuth token stored in memory (no namespace available)',
+                  );
+                }
+              } else if (tokenData.error) {
+                fastify.log.error(
+                  {
+                    error: tokenData.error,
+                    description: tokenData.error_description,
+                  },
+                  'Token exchange failed',
+                );
+              }
+            }
+          } catch (tokenError: any) {
+            fastify.log.error(
+              { error: tokenError.message },
+              'Failed to exchange authorization code for token',
+            );
           }
         }
 
         fastify.log.info({ redirectUrl }, 'OAuth authentication successful');
 
-        // For now, show success page
-        // In production, this should exchange the code for a token and redirect
-        const successPage = `
-          <html>
-            <head>
-              <title>Authentication Successful</title>
-              <script>
-                // Close the popup window if this was opened in a popup
-                if (window.opener) {
-                  window.opener.postMessage({ type: 'oauth-success' }, '*');
-                  setTimeout(() => window.close(), 1000);
-                }
-              </script>
-            </head>
-            <body>
-              <h1>Authentication Successful!</h1>
-              <p>You have successfully authenticated with the OAuth provider.</p>
-              <p>Authorization code: <code>${code.substring(0, 20)}...</code></p>
-              <p>This window will close automatically, or <a href="${redirectUrl}">click here to continue</a>.</p>
-            </body>
-          </html>
-        `;
-
-        return reply.type('text/html').code(200).send(successPage);
+        // Redirect to the original URL
+        return reply.redirect(302, redirectUrl);
       } catch (error: any) {
         fastify.log.error('Error handling OAuth callback:', error);
         return reply.code(500).send({

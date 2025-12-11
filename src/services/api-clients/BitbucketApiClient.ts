@@ -281,7 +281,7 @@ export class BitbucketApiClient implements ScmApiClient {
    * Build OAuth authentication URL for Bitbucket
    */
   private buildOAuthUrl(): string {
-    const apiEndpoint = process.env.CHE_API_ENDPOINT || 'http://localhost:8080';
+    const apiEndpoint = process.env.CHE_API || process.env.CHE_API_ENDPOINT || 'http://localhost:8080';
     return `${apiEndpoint}/oauth/authenticate?oauth_provider=bitbucket&scope=repository&request_method=POST&signature_method=rsa`;
   }
 

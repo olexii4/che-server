@@ -12,7 +12,7 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
-import { getKubeConfig } from '../helpers/getKubernetesClient';
+import { getServiceAccountKubeConfig } from '../helpers/getKubernetesClient';
 import { DockerConfigRequest } from '../models/CredentialsModels';
 import { DockerConfigService } from '../services/DockerConfigService';
 
@@ -62,7 +62,8 @@ export async function registerDockerConfigRoutes(fastify: FastifyInstance): Prom
         }
 
         const { namespace } = request.params;
-        const kubeConfig = getKubeConfig(request.subject.token);
+        // Use ServiceAccount for elevated permissions to manage secrets
+        const kubeConfig = getServiceAccountKubeConfig();
         const service = new DockerConfigService(kubeConfig);
 
         const dockerConfig = await service.read(namespace);
@@ -127,7 +128,8 @@ export async function registerDockerConfigRoutes(fastify: FastifyInstance): Prom
 
         const { namespace } = request.params;
         const { dockerconfig } = request.body;
-        const kubeConfig = getKubeConfig(request.subject.token);
+        // Use ServiceAccount for elevated permissions to manage secrets
+        const kubeConfig = getServiceAccountKubeConfig();
         const service = new DockerConfigService(kubeConfig);
 
         const updated = await service.update(namespace, dockerconfig);

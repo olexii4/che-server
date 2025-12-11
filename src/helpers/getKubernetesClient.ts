@@ -68,3 +68,21 @@ export function getKubeConfig(token: string): k8s.KubeConfig {
   const kubeConfigProvider = new KubeConfigProvider();
   return kubeConfigProvider.getKubeConfig(token);
 }
+
+/**
+ * Get KubeConfig with the ServiceAccount's token.
+ *
+ * This returns the che-server's ServiceAccount KubeConfig,
+ * which has elevated permissions for managing user namespace resources.
+ *
+ * Use this for operations like:
+ * - Managing secrets (PATs, SSH keys, Docker config)
+ * - Creating RoleBindings
+ * - Other privileged operations on behalf of users
+ *
+ * @returns KubeConfig with ServiceAccount token
+ */
+export function getServiceAccountKubeConfig(): k8s.KubeConfig {
+  const kubeConfigProvider = new KubeConfigProvider();
+  return kubeConfigProvider.getServiceAccountKubeConfig();
+}

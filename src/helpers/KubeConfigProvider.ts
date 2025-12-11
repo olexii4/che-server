@@ -99,7 +99,7 @@ export class KubeConfigProvider {
     const context: k8s.Context = {
       user: user.name,
       cluster: currentContext.cluster,
-      name: 'logged-user',
+      name: 'request-user-context',
       namespace: currentContext.namespace, // Preserve namespace if set
     };
 
@@ -166,56 +166,26 @@ export class KubeConfigProvider {
   }
 
   /**
+   * Get the ServiceAccount's KubeConfig (for operations that need elevated permissions).
+   *
+   * This returns the base KubeConfig with the ServiceAccount's token,
+   * which has the permissions granted to the che-server ServiceAccount.
+   *
+   * Use this for operations like:
+   * - Managing secrets in user namespaces (PATs, SSH keys)
+   * - Creating RoleBindings
+   * - Other privileged operations
+   *
+   * @returns KubeConfig with ServiceAccount token
+   */
+  getServiceAccountKubeConfig(): k8s.KubeConfig {
+    return this.getBaseKubeConfig();
+  }
+
+  /**
    * Check if running in local development mode.
    */
   isLocal(): boolean {
     return this.isLocalRun;
-  }
-
-  /**
-   * Get the ServiceAccount's KubeConfig (che-server's own credentials).
-   *
-   * This is used for privileged operations that require the che-server's
-   * ServiceAccount permissions, such as creating RoleBindings in user namespaces.
-   *
-   * Matches Java behavior: CheServerKubernetesClientFactory uses the `che` ServiceAccount
-   * for operations that need elevated permissions.
-   *
-   * @returns KubeConfig using the ServiceAccount token
-   */
-  getServiceAccountKubeConfig(): k8s.KubeConfig {
-    if (this.isLocalRun) {
-      // In local development, use local kubeconfig (typically admin)
-      const kc = new k8s.KubeConfig();
-      let kubeConfigFile = process.env.KUBECONFIG;
-
-      if (!kubeConfigFile) {
-        kubeConfigFile = process.env.HOME + '/.kube/config';
-      }
-
-      try {
-        kc.loadFromFile(kubeConfigFile);
-        logger.debug(`ServiceAccount KubeConfig: Using local kubeconfig from: ${kubeConfigFile}`);
-      } catch (error: any) {
-        logger.warn({ error }, `Failed to load kubeconfig, trying loadFromDefault()`);
-        kc.loadFromDefault();
-      }
-
-      return kc;
-    } else {
-      // In production, use in-cluster config (che-server's ServiceAccount)
-      if (!this.inClusterKubeConfig) {
-        this.inClusterKubeConfig = new k8s.KubeConfig();
-        try {
-          this.inClusterKubeConfig.loadFromCluster();
-          logger.info('ServiceAccount KubeConfig: Loaded in-cluster Kubernetes configuration');
-        } catch (error: any) {
-          logger.error({ error }, 'Failed to load in-cluster config');
-          throw new Error('Failed to load in-cluster Kubernetes configuration');
-        }
-      }
-
-      return this.inClusterKubeConfig;
-    }
   }
 }

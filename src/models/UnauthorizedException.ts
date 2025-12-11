@@ -76,8 +76,14 @@ export function buildOAuthAuthenticateUrl(
     signature_method: signatureMethod,
   });
 
-  // Ensure apiEndpoint doesn't end with slash and add /api prefix
-  const baseUrl = apiEndpoint.endsWith('/') ? apiEndpoint.slice(0, -1) : apiEndpoint;
+  // Ensure apiEndpoint doesn't end with slash
+  let baseUrl = apiEndpoint.endsWith('/') ? apiEndpoint.slice(0, -1) : apiEndpoint;
+
+  // Remove trailing /api if present (to avoid /api/api/...)
+  if (baseUrl.endsWith('/api')) {
+    baseUrl = baseUrl.slice(0, -4);
+  }
+
   return `${baseUrl}/api/oauth/authenticate?${params.toString()}`;
 }
 

@@ -122,8 +122,14 @@ export interface FactoryResolverParams {
   /** URL of the factory source */
   url?: string;
 
-  /** Authorization header for private repository access */
+  /** Authorization header for private repository access (OIDC token - NOT used for SCM) */
   authorization?: string;
+
+  /** User's namespace for PAT lookup (e.g., admin-che) */
+  userNamespace?: string;
+
+  /** User's ID for PAT lookup */
+  userId?: string;
 
   /** Additional custom parameters */
   [key: string]: string | boolean | undefined;

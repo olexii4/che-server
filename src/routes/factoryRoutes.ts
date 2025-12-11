@@ -110,12 +110,20 @@ export async function registerFactoryRoutes(fastify: FastifyInstance): Promise<v
         // Get parameters from request body
         const parameters: FactoryResolverParams = (request.body as any) || {};
 
-        // NOTE: We intentionally do NOT pass the OIDC authorization header to the factory resolver.
-        // The authorization header from the request contains the Che OIDC token (from Dex),
-        // which is NOT a valid GitHub/GitLab/Bitbucket token.
-        // For private repository access, users should configure Personal Access Tokens
-        // which are stored in Kubernetes secrets and looked up by the SCM resolvers.
-        // Forwarding the OIDC token to GitHub causes 404 errors for public repos.
+        // Pass user context for PAT lookup (private repository access)
+        // NOTE: We pass userNamespace, NOT the OIDC Authorization header
+        // The OIDC token is for Eclipse Che authentication, not GitHub/GitLab
+        // PATs are stored in Kubernetes secrets in the user's namespace
+        if (request.subject) {
+          const username = request.subject.userName || request.subject.userId;
+          parameters.userNamespace = `${username}-che`;
+          parameters.userId = request.subject.userId || request.subject.userName;
+          fastify.log.info(
+            `[FactoryRoutes] User context: namespace="${parameters.userNamespace}", userId="${parameters.userId}"`,
+          );
+        } else {
+          fastify.log.warn('[FactoryRoutes] No user context available for PAT lookup');
+        }
 
         // Resolve factory
         const factory = await factoryService.resolveFactory(parameters);

@@ -12,7 +12,7 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
-import { getKubeConfig } from '../helpers/getKubernetesClient';
+import { getServiceAccountKubeConfig } from '../helpers/getKubernetesClient';
 import { GitConfig } from '../models/CredentialsModels';
 import { GitConfigService } from '../services/GitConfigService';
 
@@ -77,7 +77,8 @@ export async function registerGitConfigRoutes(fastify: FastifyInstance): Promise
         }
 
         const { namespace } = request.params;
-        const kubeConfig = getKubeConfig(request.subject.token);
+        // Use ServiceAccount for elevated permissions to manage secrets
+        const kubeConfig = getServiceAccountKubeConfig();
         const service = new GitConfigService(kubeConfig);
 
         const gitConfig = await service.read(namespace);
@@ -153,7 +154,8 @@ export async function registerGitConfigRoutes(fastify: FastifyInstance): Promise
 
         const { namespace } = request.params;
         const gitConfig = request.body;
-        const kubeConfig = getKubeConfig(request.subject.token);
+        // Use ServiceAccount for elevated permissions to manage secrets
+        const kubeConfig = getServiceAccountKubeConfig();
         const service = new GitConfigService(kubeConfig);
 
         const updated = await service.patch(namespace, gitConfig);

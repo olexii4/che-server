@@ -198,10 +198,15 @@ export class PersonalAccessTokenService {
       throw new Error('Personal access token data is required');
     }
 
+    // When isOauth is true, prefix with 'oauth2-' so it can be detected later
+    const tokenNameAnnotation = token.isOauth
+      ? `oauth2-${token.gitProvider}`
+      : token.gitProvider;
+
     const annotations: { [key: string]: string } = {
       'che.eclipse.org/che-userid': token.cheUserId,
       'che.eclipse.org/scm-provider-name': token.gitProvider,
-      'che.eclipse.org/scm-personal-access-token-name': token.gitProvider,
+      'che.eclipse.org/scm-personal-access-token-name': tokenNameAnnotation,
       'che.eclipse.org/scm-url': this.sanitizeEndpoint(token.gitProviderEndpoint),
     };
 
@@ -230,7 +235,13 @@ export class PersonalAccessTokenService {
   private sanitizeEndpoint(endpoint: string): string {
     try {
       const url = new URL(endpoint);
-      return url.href;
+      // url.href adds trailing slash, so use origin + pathname instead
+      // For base URLs like https://github.com, this returns https://github.com (no trailing slash)
+      let result = url.origin;
+      if (url.pathname && url.pathname !== '/') {
+        result += url.pathname;
+      }
+      return result;
     } catch {
       return endpoint;
     }

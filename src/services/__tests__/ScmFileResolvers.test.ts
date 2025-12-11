@@ -72,8 +72,7 @@ describe('GitHubFileResolver', () => {
       expect(axiosInstanceNoCert.get).toHaveBeenCalled();
     });
 
-    it('should throw file not found error on 404 without authorization', async () => {
-      // For GitHub raw URLs, 404 means file doesn't exist (not private repo)
+    it('should throw UnauthorizedException on 404 without authorization', async () => {
       (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
         status: 404,
         statusText: 'Not Found',
@@ -81,7 +80,7 @@ describe('GitHubFileResolver', () => {
 
       await expect(
         resolver.fileContent('https://github.com/user/repo', 'missing.md'),
-      ).rejects.toThrow('not found');
+      ).rejects.toThrow(UnauthorizedException);
     });
 
     it('should throw file not found error on 404 with authorization', async () => {
@@ -108,16 +107,15 @@ describe('GitHubFileResolver', () => {
   });
 
   describe('fileContent() without file path (auto-detect devfile)', () => {
-    it('should throw Error if no devfile found without auth', async () => {
-      // All attempts fail with 404 - file doesn't exist
-      // For GitHub raw URLs, 404 means file not found (not private repo)
+    it('should throw UnauthorizedException if no devfile found without auth', async () => {
+      // All attempts fail with 404 - should treat as private repo
       (axiosInstanceNoCert.get as jest.Mock).mockResolvedValue({
         status: 404,
         statusText: 'Not Found',
       });
 
       await expect(resolver.fileContent('https://github.com/user/repo')).rejects.toThrow(
-        'No devfile found',
+        UnauthorizedException,
       );
     });
 
@@ -155,7 +153,7 @@ describe('GitHubFileResolver', () => {
   });
 
   describe('URL construction', () => {
-    it('should construct proper raw.githubusercontent.com URLs', async () => {
+    it('should use GitHub API URLs when authorization is provided', async () => {
       (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
         status: 200,
         data: 'content',
@@ -165,6 +163,23 @@ describe('GitHubFileResolver', () => {
         'https://github.com/eclipse/che/tree/main',
         'devfile.yaml',
         'Bearer token',
+      );
+
+      const callUrl = (axiosInstanceNoCert.get as jest.Mock).mock.calls[0][0];
+      // When authorization is provided, GitHub API is used (raw URLs don't support auth)
+      expect(callUrl).toContain('api.github.com/repos/eclipse/che/contents/devfile.yaml');
+    });
+
+    it('should use raw.githubusercontent.com URLs when no authorization', async () => {
+      (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
+        status: 200,
+        data: 'content',
+      });
+
+      await resolver.fileContent(
+        'https://github.com/eclipse/che/tree/main',
+        'devfile.yaml',
+        // No authorization - use raw URL
       );
 
       const callUrl = (axiosInstanceNoCert.get as jest.Mock).mock.calls[0][0];
@@ -562,10 +577,12 @@ describe('ScmService', () => {
         data: mockContent,
       });
 
+      // Note: UserContext is now passed instead of authorization string
+      // The PatLookupService will look up tokens from Kubernetes secrets
       const content = await scmService.resolveFile(
         'https://github.com/user/repo',
         'devfile.yaml',
-        'Bearer token',
+        undefined, // UserContext - tests mock axios directly
       );
 
       expect(content).toBe(mockContent);
@@ -581,7 +598,7 @@ describe('ScmService', () => {
       const content = await scmService.resolveFile(
         'https://gitlab.com/user/repo',
         'devfile.yaml',
-        'Bearer token',
+        undefined, // UserContext - tests mock axios directly
       );
 
       expect(content).toBe(mockContent);
@@ -597,7 +614,7 @@ describe('ScmService', () => {
       const content = await scmService.resolveFile(
         'https://bitbucket.org/workspace/repo',
         'devfile.yaml',
-        'Bearer token',
+        undefined, // UserContext - tests mock axios directly
       );
 
       expect(content).toBe(mockContent);
@@ -634,7 +651,7 @@ describe('ScmService', () => {
       const content = await scmService.resolveFile(
         'https://github.com/user/repo',
         '',
-        'Bearer token',
+        undefined, // UserContext - tests mock axios directly
       );
 
       expect(content).toBe(devfileContent);
@@ -663,30 +680,32 @@ describe('ScmService', () => {
       const content = await scmService.resolveFile(
         'https://github.com/user/repo',
         '',
-        'Bearer token',
+        undefined, // UserContext - tests mock axios directly
       );
 
       expect(content).toBe(devfileContent);
     });
 
     it('should try multiple filenames for GitLab with authorization', async () => {
-      // First attempt fails
+      // First attempt fails (devfile.yaml not found)
       (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
         status: 404,
         statusText: 'Not Found',
       });
 
-      // Second attempt succeeds
+      // Second attempt succeeds (.devfile.yaml found)
       const devfileContent = 'schemaVersion: 2.1.0';
       (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
         status: 200,
         data: devfileContent,
       });
 
-      const content = await scmService.resolveFile(
+      // Create a resolver directly with authorization to bypass PAT lookup
+      const gitlabResolver = new GitLabFileResolver();
+      const content = await gitlabResolver.fileContent(
         'https://gitlab.com/user/repo',
-        '',
-        'Bearer token',
+        undefined, // No specific file - try all devfile filenames
+        'Bearer test-token', // Provide authorization so 404 = file not found, not private repo
       );
 
       expect(content).toBe(devfileContent);

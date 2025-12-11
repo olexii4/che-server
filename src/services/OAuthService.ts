@@ -269,11 +269,16 @@ export class OAuthService {
    */
   getRegisteredAuthenticators(): OAuthAuthenticatorDescriptor[] {
     const descriptors: OAuthAuthenticatorDescriptor[] = [];
-    const apiEndpoint = process.env.CHE_API_ENDPOINT || 'http://localhost:8080';
+    // Use CHE_API or CHE_API_ENDPOINT, remove trailing /api to avoid /api/api duplication
+    let apiEndpoint =
+      process.env.CHE_API || process.env.CHE_API_ENDPOINT || 'http://localhost:8080';
+    if (apiEndpoint.endsWith('/api')) {
+      apiEndpoint = apiEndpoint.slice(0, -4);
+    }
 
     this.providers.forEach((config, name) => {
-      // Get the base endpoint URL (without /oauth/authorize path)
-      let endpointUrl = config.authorizationEndpoint;
+      // Get the base endpoint URL for display (without /oauth/authorize path)
+      let endpointUrl: string;
 
       // Extract base URL for display
       if (name === 'github') {
@@ -284,11 +289,24 @@ export class OAuthService {
         endpointUrl = 'https://bitbucket.org';
       } else if (name === 'azure-devops') {
         endpointUrl = 'https://dev.azure.com';
+      } else {
+        // Fallback: try to extract base URL from authorization endpoint
+        try {
+          const url = new URL(config.authorizationEndpoint);
+          endpointUrl = `${url.protocol}//${url.host}`;
+        } catch {
+          endpointUrl = config.authorizationEndpoint;
+        }
       }
 
       descriptors.push({
         name: name,
         endpointUrl: endpointUrl,
+        // Include full authorization endpoint for OAuth flow
+        authorizationEndpoint: config.authorizationEndpoint,
+        // Include clientId and clientSecret from configuration
+        clientId: config.clientId,
+        clientSecret: config.clientSecret,
         links: [
           {
             method: 'GET',

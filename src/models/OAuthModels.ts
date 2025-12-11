@@ -62,8 +62,17 @@ export interface OAuthAuthenticatorDescriptor {
   /** Name of the OAuth provider (e.g., "github", "gitlab") */
   name: string;
 
-  /** Endpoint URL for OAuth provider */
+  /** Endpoint URL for OAuth provider (base URL for display) */
   endpointUrl: string;
+
+  /** Full authorization endpoint URL (e.g., https://github.com/login/oauth/authorize) */
+  authorizationEndpoint?: string;
+
+  /** OAuth Client ID from configuration */
+  clientId?: string;
+
+  /** OAuth Client Secret from configuration (should not be exposed in API responses) */
+  clientSecret?: string;
 
   /** HAL links for OAuth operations */
   links?: OAuthLink[];

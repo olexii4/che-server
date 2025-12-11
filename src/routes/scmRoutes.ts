@@ -11,7 +11,7 @@
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { ScmService } from '../services/ScmFileResolvers';
+import { ScmService, UserContext } from '../services/ScmFileResolvers';
 import { UnauthorizedException } from '../models/UnauthorizedException';
 import { logger } from '../utils/logger';
 
@@ -169,17 +169,26 @@ The response includes Content-Disposition header to trigger file download in bro
           });
         }
 
-        // NOTE: We intentionally do NOT pass the OIDC authorization header to SCM resolvers.
-        // The authorization header from the request contains the Che OIDC token (from Dex),
-        // which is NOT a valid GitHub/GitLab/Bitbucket token.
-        // For private repository access, users should configure Personal Access Tokens
-        // which are stored in Kubernetes secrets and looked up by the SCM resolvers.
-        // Forwarding the OIDC token to GitHub causes 404 errors for public repos.
-        logger.info(`[scmRoutes] Received request for repository: ${repository}, file: ${file}`);
+        // Pass user context for PAT lookup (private repository access)
+        // NOTE: We use userNamespace/userId, NOT the OIDC Authorization header
+        // The OIDC token is for Eclipse Che authentication, not GitHub/GitLab
+        // PATs are stored in Kubernetes secrets in the user's namespace
+        let userContext: UserContext | undefined;
+        if (request.subject) {
+          const username = request.subject.userName || request.subject.userId;
+          userContext = {
+            namespace: `${username}-che`,
+            userId: request.subject.userId || request.subject.userName,
+          };
+        }
 
-        // Resolve file content without OIDC auth (works for public repos)
-        // Private repos will require Personal Access Tokens configured in Che
-        const content = await scmResolvers.resolveFile(repository, file, undefined);
+        logger.info(`[scmRoutes] Received request for repository: ${repository}, file: ${file}`);
+        logger.info(
+          `[scmRoutes] User context: namespace="${userContext?.namespace}", userId="${userContext?.userId}"`,
+        );
+
+        // Resolve file content (will look up PAT from K8s secrets if userContext provided)
+        const content = await scmResolvers.resolveFile(repository, file, userContext);
 
         // Extract filename from file path
         const filename = file.split('/').pop() || 'file';

@@ -12,7 +12,7 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
-import { getKubeConfig } from '../helpers/getKubernetesClient';
+import { getServiceAccountKubeConfig } from '../helpers/getKubernetesClient';
 import { NewSshKey } from '../models/CredentialsModels';
 import { SSHKeysService } from '../services/SSHKeysService';
 
@@ -74,7 +74,8 @@ export async function registerSshKeysRoutes(fastify: FastifyInstance): Promise<v
         }
 
         const { namespace } = request.params;
-        const kubeConfig = getKubeConfig(request.subject.token);
+        // Use ServiceAccount for elevated permissions to manage secrets
+        const kubeConfig = getServiceAccountKubeConfig();
         const service = new SSHKeysService(kubeConfig);
 
         const sshKeys = await service.list(namespace);
@@ -139,7 +140,8 @@ export async function registerSshKeysRoutes(fastify: FastifyInstance): Promise<v
 
         const { namespace } = request.params;
         const sshKey = request.body;
-        const kubeConfig = getKubeConfig(request.subject.token);
+        // Use ServiceAccount for elevated permissions to manage secrets
+        const kubeConfig = getServiceAccountKubeConfig();
         const service = new SSHKeysService(kubeConfig);
 
         const created = await service.add(namespace, sshKey);
@@ -191,7 +193,8 @@ export async function registerSshKeysRoutes(fastify: FastifyInstance): Promise<v
         }
 
         const { namespace, name } = request.params;
-        const kubeConfig = getKubeConfig(request.subject.token);
+        // Use ServiceAccount for elevated permissions to manage secrets
+        const kubeConfig = getServiceAccountKubeConfig();
         const service = new SSHKeysService(kubeConfig);
 
         await service.delete(namespace, name);

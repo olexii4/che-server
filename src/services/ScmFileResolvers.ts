@@ -20,6 +20,15 @@ import {
 } from '../models/UnauthorizedException';
 import { axiosInstance, axiosInstanceNoCert } from '../helpers/getCertificateAuthority';
 import { logger } from '../utils/logger';
+import { PatLookupService, PatInfo } from './PatLookupService';
+
+/**
+ * User context for PAT lookup
+ */
+export interface UserContext {
+  namespace?: string;
+  userId?: string;
+}
 
 /**
  * Generic SCM File Resolver
@@ -190,21 +199,27 @@ export class GitHubFileResolver implements ScmFileResolver {
    * First tries without certificate validation (for public repos)
    * Then retries with certificate validation (for self-signed certs)
    *
-   * Similar to GitLab and Bitbucket, GitHub returns 404 for private repositories when accessed without auth
+   * For private repos with authorization, uses GitHub API instead of raw.githubusercontent.com
+   * because raw.githubusercontent.com doesn't support authentication headers.
    */
   private async fetchFromUrl(
     url: string,
     repository: string,
     authorization?: string,
   ): Promise<string> {
+    // If authorization is provided and URL is raw.githubusercontent.com,
+    // we need to use the GitHub API instead (raw URLs don't support auth)
+    if (authorization && url.includes('raw.githubusercontent.com')) {
+      logger.info(
+        `[GitHubFileResolver] Authorization provided - using GitHub API instead of raw URL`,
+      );
+      return await this.fetchFromGitHubApi(url, authorization);
+    }
+
     const headers: Record<string, string> = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET',
     };
-
-    if (authorization) {
-      headers['Authorization'] = authorization;
-    }
 
     const config = {
       headers,
@@ -216,11 +231,29 @@ export class GitHubFileResolver implements ScmFileResolver {
       // Try without certificate validation first (for public URLs)
       axiosResponse = await axiosInstanceNoCert.get(url, config);
     } catch (error: any) {
-      // If 404, file doesn't exist - throw file not found (don't assume private repo)
+      // If 404, check if we should treat it as authentication error
       if (error.response?.status === 404) {
-        logger.info(
-          `[GitHubFileResolver] 404 exception - file not found at ${url}`,
-        );
+        if (!authorization) {
+          // No auth + 404 = might be private repo
+          logger.info(
+            `[GitHubFileResolver] 404 without authorization - treating as potential private repository`,
+          );
+          const oauthProvider = 'github';
+          const authenticateUrl = buildOAuthAuthenticateUrl(
+            process.env.CHE_API || process.env.CHE_API_ENDPOINT || 'http://localhost:8080',
+            oauthProvider,
+            'repo',
+            'POST',
+            'rsa',
+          );
+          throw new UnauthorizedException(
+            'SCM Authentication required',
+            oauthProvider,
+            '2.0',
+            authenticateUrl,
+          );
+        }
+
         throw new Error(SCM_CONSTANTS.ERRORS.FILE_NOT_FOUND);
       }
       // For other errors, try with certificate validation
@@ -228,12 +261,27 @@ export class GitHubFileResolver implements ScmFileResolver {
     }
 
     if (axiosResponse.status === 404) {
-      // For GitHub's raw.githubusercontent.com, 404 simply means file doesn't exist
-      // We should NOT assume it's a private repo - just throw file not found
-      // and let the caller try the next devfile filename
-      logger.info(
-        `[GitHubFileResolver] 404 - file not found at ${url}`,
-      );
+      if (!authorization) {
+        // No auth + 404 = might be private repo
+        logger.info(
+          `[GitHubFileResolver] 404 without authorization - treating as potential private repository`,
+        );
+        const oauthProvider = 'github';
+        const authenticateUrl = buildOAuthAuthenticateUrl(
+          process.env.CHE_API || process.env.CHE_API_ENDPOINT || 'http://localhost:8080',
+          oauthProvider,
+          'repo',
+          'POST',
+          'rsa',
+        );
+        throw new UnauthorizedException(
+          'SCM Authentication required',
+          oauthProvider,
+          '2.0',
+          authenticateUrl,
+        );
+      }
+
       throw new Error(SCM_CONSTANTS.ERRORS.FILE_NOT_FOUND);
     }
 
@@ -242,6 +290,108 @@ export class GitHubFileResolver implements ScmFileResolver {
     }
 
     return axiosResponse.data;
+  }
+
+  /**
+   * Fetch file content from GitHub API for private repositories
+   * Converts raw.githubusercontent.com URL to GitHub API URL
+   *
+   * raw.githubusercontent.com URL format:
+   *   https://raw.githubusercontent.com/{owner}/{repo}/{ref}/{path}
+   *
+   * GitHub API URL format:
+   *   https://api.github.com/repos/{owner}/{repo}/contents/{path}?ref={ref}
+   *
+   * The API returns JSON with base64-encoded content or a download_url for files
+   */
+  private async fetchFromGitHubApi(rawUrl: string, authorization: string): Promise<string> {
+    // Parse raw.githubusercontent.com URL
+    // Format: https://raw.githubusercontent.com/{owner}/{repo}/{ref}/{path}
+    const match = rawUrl.match(
+      /https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)/,
+    );
+
+    if (!match) {
+      throw new Error(`Invalid raw.githubusercontent.com URL format: ${rawUrl}`);
+    }
+
+    const [, owner, repo, ref, path] = match;
+
+    // GitHub API doesn't support 'HEAD' as ref - we need to get the default branch
+    // or try common branch names
+    const branchesToTry =
+      ref === 'HEAD' ? ['main', 'master', 'HEAD'] : [ref, 'main', 'master'];
+
+    const headers: Record<string, string> = {
+      Authorization: authorization,
+      Accept: 'application/vnd.github.v3.raw', // Get raw file content directly
+      'User-Agent': 'che-server', // GitHub API requires User-Agent
+    };
+
+    const config = {
+      headers,
+      validateStatus: () => true, // Don't throw on any status code
+    };
+
+    let lastError: Error | null = null;
+
+    for (const branch of branchesToTry) {
+      const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
+      logger.info(`[GitHubFileResolver] Trying GitHub API URL: ${apiUrl}`);
+
+      const axiosResponse = await axiosInstanceNoCert.get(apiUrl, config);
+
+      logger.info(
+        `[GitHubFileResolver] GitHub API response: status=${axiosResponse.status}, branch=${branch}`,
+      );
+
+      // Check for authentication errors (401/403)
+      if (axiosResponse.status === 401 || axiosResponse.status === 403) {
+        // Log the error message from GitHub for debugging
+        const errorMessage =
+          typeof axiosResponse.data === 'object'
+            ? JSON.stringify(axiosResponse.data)
+            : axiosResponse.data;
+        logger.info(
+          `[GitHubFileResolver] GitHub API auth error: ${errorMessage}`,
+        );
+
+        const oauthProvider = 'github';
+        const authenticateUrl = buildOAuthAuthenticateUrl(
+          process.env.CHE_API || process.env.CHE_API_ENDPOINT || 'http://localhost:8080',
+          oauthProvider,
+          'repo',
+          'POST',
+          'rsa',
+        );
+        throw new UnauthorizedException(
+          'SCM Authentication required (invalid or expired token)',
+          oauthProvider,
+          '2.0',
+          authenticateUrl,
+        );
+      }
+
+      // 404 means file not found OR wrong branch - try next branch
+      if (axiosResponse.status === 404) {
+        lastError = new Error(`File not found at ref=${branch}`);
+        continue;
+      }
+
+      if (axiosResponse.status === 200) {
+        logger.info(`[GitHubFileResolver] ✅ Successfully fetched from branch: ${branch}`);
+        // With Accept: application/vnd.github.v3.raw, the response is the raw file content
+        return axiosResponse.data;
+      }
+
+      // Other error
+      lastError = new Error(
+        `GitHub API error: HTTP ${axiosResponse.status} ${axiosResponse.statusText}`,
+      );
+    }
+
+    // All branches failed
+    throw lastError || new Error(SCM_CONSTANTS.ERRORS.FILE_NOT_FOUND);
   }
 
   /**
@@ -399,7 +549,7 @@ export class GitLabFileResolver implements ScmFileResolver {
           );
           const oauthProvider = 'gitlab';
           const authenticateUrl = buildOAuthAuthenticateUrl(
-            process.env.CHE_API_ENDPOINT || 'http://localhost:8080',
+            process.env.CHE_API || process.env.CHE_API_ENDPOINT || 'http://localhost:8080',
             oauthProvider,
             'api write_repository',
             'POST',
@@ -426,7 +576,7 @@ export class GitLabFileResolver implements ScmFileResolver {
         );
         const oauthProvider = 'gitlab';
         const authenticateUrl = buildOAuthAuthenticateUrl(
-          process.env.CHE_API_ENDPOINT || 'http://localhost:8080',
+          process.env.CHE_API || process.env.CHE_API_ENDPOINT || 'http://localhost:8080',
           oauthProvider,
           'api write_repository',
           'POST',
@@ -487,7 +637,7 @@ export class BitbucketFileResolver implements ScmFileResolver {
 
   constructor() {
     // Get API endpoint from environment or use default
-    this.apiEndpoint = process.env.CHE_API_ENDPOINT || 'http://localhost:8080';
+    this.apiEndpoint = process.env.CHE_API || process.env.CHE_API_ENDPOINT || 'http://localhost:8080';
   }
 
   accept(repository: string): boolean {
@@ -933,7 +1083,7 @@ export class BitbucketFileResolver implements ScmFileResolver {
 export class AzureDevOpsFileResolver implements ScmFileResolver {
   private readonly apiEndpoint: string;
 
-  constructor(apiEndpoint: string = process.env.CHE_API_ENDPOINT || 'http://localhost:8080') {
+  constructor(apiEndpoint: string = process.env.CHE_API || process.env.CHE_API_ENDPOINT || 'http://localhost:8080') {
     this.apiEndpoint = apiEndpoint;
   }
 
@@ -1193,9 +1343,14 @@ export class AzureDevOpsFileResolver implements ScmFileResolver {
  * SCM Service - Manages SCM file resolution
  *
  * Based on: org.eclipse.che.api.factory.server.ScmService
+ *
+ * This service now supports PAT lookup from Kubernetes secrets for private repository access.
+ * The OIDC token (used for Eclipse Che authentication) is NOT used for GitHub/GitLab access.
+ * Instead, PATs stored in the user's namespace are retrieved and used.
  */
 export class ScmService {
   private resolvers: ScmFileResolver[] = [];
+  private patLookupService: PatLookupService;
 
   constructor() {
     // Register default resolvers
@@ -1205,6 +1360,9 @@ export class ScmService {
     this.registerResolver(new AzureDevOpsFileResolver());
     // Generic resolver as fallback
     this.registerResolver(new GenericScmFileResolver());
+
+    // Initialize PAT lookup service
+    this.patLookupService = new PatLookupService();
   }
 
   /**
@@ -1221,32 +1379,86 @@ export class ScmService {
    *
    * @param repository - Repository URL
    * @param filePath - Path to file in repository (optional - will try default devfile filenames if empty)
-   * @param authorization - Optional Authorization header for private repositories
+   * @param userContext - User context for PAT lookup (namespace, userId)
    * @returns Promise resolving to file content
    * @throws Error if no suitable resolver found or file not accessible
    */
   async resolveFile(
     repository: string,
     filePath?: string,
-    authorization?: string,
+    userContext?: UserContext,
   ): Promise<string> {
     if (!repository) {
       throw new Error(SCM_CONSTANTS.ERRORS.REPOSITORY_REQUIRED);
     }
 
     logger.info(`[ScmService] Resolving file for repository: ${repository}, filePath: ${filePath}`);
-    logger.info(`[ScmService] Authorization provided: ${authorization ? 'YES' : 'NO'}`);
-    if (authorization) {
-      logger.info(`[ScmService] Authorization value: ${authorization.substring(0, 20)}...`);
-    }
+    logger.info(
+      `[ScmService] User context: namespace="${userContext?.namespace}", userId="${userContext?.userId}"`,
+    );
 
     // Find suitable resolver
     const resolver = this.getScmFileResolver(repository);
-
     logger.info(`[ScmService] Resolver found: ${resolver.constructor.name}`);
+
+    // Look up PAT from Kubernetes secrets if user context is provided
+    let authorization: string | undefined;
+    if (userContext?.namespace) {
+      const pat = await this.lookupPat(repository, userContext.namespace);
+      if (pat) {
+        // Use Bearer token format for GitHub/GitLab, Basic for Bitbucket
+        const provider = PatLookupService.getProviderFromUrl(repository);
+        if (provider === 'bitbucket') {
+          // Bitbucket prefers Basic auth with x-token-auth:token
+          authorization = `Basic ${Buffer.from(`x-token-auth:${pat.tokenData}`).toString('base64')}`;
+        } else {
+          // GitHub, GitLab, Azure DevOps use Bearer tokens
+          authorization = `Bearer ${pat.tokenData}`;
+        }
+        logger.info(
+          `[ScmService] ✅ Using PAT from Kubernetes for provider "${provider}": token name="${pat.tokenName}"`,
+        );
+      } else {
+        logger.info(`[ScmService] No PAT found for repository, will try without authentication`);
+      }
+    } else {
+      logger.info(`[ScmService] No user context provided, cannot look up PAT`);
+    }
+
     // Resolve file content
     // If filePath is empty or undefined, the resolver will try default devfile filenames
     return await resolver.fileContent(repository, filePath || '', authorization);
+  }
+
+  /**
+   * Look up PAT from Kubernetes secrets for the given repository
+   *
+   * @param repository - Repository URL
+   * @param namespace - User's namespace
+   * @returns PAT info or null if not found
+   */
+  private async lookupPat(repository: string, namespace: string): Promise<PatInfo | null> {
+    try {
+      // Determine SCM provider from repository URL
+      const provider = PatLookupService.getProviderFromUrl(repository);
+      if (provider === 'unknown') {
+        logger.info(`[ScmService] Unknown SCM provider for repository: ${repository}`);
+        return null;
+      }
+
+      // Get SCM URL (e.g., https://github.com)
+      const scmUrl = PatLookupService.getScmUrlFromRepoUrl(repository);
+
+      logger.info(
+        `[ScmService] Looking up PAT: provider="${provider}", scmUrl="${scmUrl}", namespace="${namespace}"`,
+      );
+
+      // Look up PAT from Kubernetes secrets
+      return await this.patLookupService.getPatForProvider(namespace, provider, scmUrl);
+    } catch (error: any) {
+      logger.error(`[ScmService] Error looking up PAT: ${error.message}`);
+      return null;
+    }
   }
 
   /**

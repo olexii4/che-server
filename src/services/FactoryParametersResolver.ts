@@ -423,10 +423,18 @@ export class ScmRepositoryFactoryResolver extends BaseFactoryParameterResolver {
 
       logger.info({ cleanUrl }, '+++++++++++++++++++++++++++++++++++ Clean URL');
       // Try to fetch devfile from repository (tries all configured filenames)
-      // Pass empty string or undefined to trigger automatic devfile detection
-      // Extract authorization from parameters if available
-      const authorization = parameters.authorization as string | undefined;
-      const devfileContent = await scmService.resolveFile(cleanUrl, undefined, authorization);
+      // Pass user context for PAT lookup (private repository access)
+      // NOTE: We use userNamespace/userId, NOT the OIDC Authorization header
+      // The OIDC token is for Eclipse Che authentication, not GitHub/GitLab
+      const userContext = {
+        namespace: parameters.userNamespace as string | undefined,
+        userId: parameters.userId as string | undefined,
+      };
+      logger.info(
+        { userContext },
+        '+++++++++++++++++++++++++++++++++++ User context for PAT lookup',
+      );
+      const devfileContent = await scmService.resolveFile(cleanUrl, undefined, userContext);
       logger.info(
         {
           status: devfileContent ? 'FOUND' : 'NOT FOUND',
@@ -607,12 +615,7 @@ export class ScmRepositoryFactoryResolver extends BaseFactoryParameterResolver {
   private generateFactoryLinks(repositoryUrl: string): Link[] {
     // Get the base URL for API server (from environment)
     // Use CHE_API_ENDPOINT if available, otherwise construct from request
-    let apiEndpoint = process.env.CHE_API_ENDPOINT || 'http://localhost:8080';
-    
-    // Remove trailing /api if present to avoid double /api/api paths
-    if (apiEndpoint.endsWith('/api')) {
-      apiEndpoint = apiEndpoint.slice(0, -4);
-    }
+    const apiEndpoint = process.env.CHE_API || process.env.CHE_API_ENDPOINT || 'http://localhost:8080';
 
     const links: Link[] = [];
 

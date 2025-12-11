@@ -207,7 +207,7 @@ export class GitlabApiClient implements ScmApiClient {
    * Build OAuth authentication URL for GitLab
    */
   private buildOAuthUrl(): string {
-    const apiEndpoint = process.env.CHE_API_ENDPOINT || 'http://localhost:8080';
+    const apiEndpoint = process.env.CHE_API || process.env.CHE_API_ENDPOINT || 'http://localhost:8080';
     return `${apiEndpoint}/oauth/authenticate?oauth_provider=gitlab&scope=api&request_method=POST&signature_method=rsa`;
   }
 
