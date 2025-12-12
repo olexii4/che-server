@@ -30,6 +30,9 @@ dotenv.config();
 
 // Create Fastify instance
 const fastify = Fastify({
+  // Avoid log spam from frequent polling endpoints (e.g. /api/system/state)
+  // while still keeping explicit application logs and error logs.
+  disableRequestLogging: true,
   logger: {
     level: process.env.LOG_LEVEL || 'info',
     transport:
