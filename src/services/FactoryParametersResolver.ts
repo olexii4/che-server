@@ -334,6 +334,25 @@ export class RawDevfileUrlFactoryParameterResolver extends BaseFactoryParameterR
  */
 export class ScmRepositoryFactoryResolver extends BaseFactoryParameterResolver {
   /**
+   * Normalize Git SSH-style URLs to HTTPS so we can parse them with URL().
+   *
+   * Supported examples:
+   * - git@github.com:org/repo.git -> https://github.com/org/repo.git
+   * - git@github.com:org/repo     -> https://github.com/org/repo
+   */
+  private normalizeScmUrl(url: string): string {
+    if (url.startsWith('git@')) {
+      const sshMatch = url.match(/^git@([^:]+):(.+)$/);
+      if (sshMatch) {
+        const hostname = sshMatch[1];
+        const path = sshMatch[2];
+        return `https://${hostname}/${path}`;
+      }
+    }
+    return url;
+  }
+
+  /**
    * Check if the URL is a valid SCM repository URL
    */
   accept(parameters: FactoryResolverParams): boolean {
@@ -344,15 +363,7 @@ export class ScmRepositoryFactoryResolver extends BaseFactoryParameterResolver {
 
     try {
       // Normalize SSH URLs to HTTPS format before checking
-      let normalizedUrl = url;
-      if (url.startsWith('git@')) {
-        const sshMatch = url.match(/^git@([^:]+):(.+)$/);
-        if (sshMatch) {
-          const hostname = sshMatch[1];
-          const path = sshMatch[2];
-          normalizedUrl = `https://${hostname}/${path}`;
-        }
-      }
+      const normalizedUrl = this.normalizeScmUrl(url);
 
       new URL(normalizedUrl);
 
@@ -531,10 +542,11 @@ export class ScmRepositoryFactoryResolver extends BaseFactoryParameterResolver {
 
   parseFactoryUrl(url: string): RemoteFactoryUrl {
     try {
-      const parsedUrl = new URL(url);
+      const normalizedUrl = this.normalizeScmUrl(url);
+      const parsedUrl = new URL(normalizedUrl);
       return {
         providerUrl: `${parsedUrl.protocol}//${parsedUrl.host}`,
-        branch: this.extractBranchFromUrl(url),
+        branch: this.extractBranchFromUrl(normalizedUrl),
       };
     } catch {
       throw new Error(`Invalid factory URL: ${url}`);

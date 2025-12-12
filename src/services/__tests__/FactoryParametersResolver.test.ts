@@ -20,6 +20,13 @@ jest.mock('../../helpers/getCertificateAuthority', () => ({
   },
 }));
 
+// Prevent tests from exiting when not running in a Kubernetes pod.
+jest.mock('../../helpers/getServiceAccountToken', () => ({
+  getServiceAccountToken: () => '',
+  isLocalRun: () => true,
+  SERVICE_ACCOUNT_TOKEN_PATH: '/run/secrets/kubernetes.io/serviceaccount/token',
+}));
+
 import {
   RawDevfileUrlFactoryParameterResolver,
   ScmRepositoryFactoryResolver,
@@ -371,6 +378,12 @@ describe('ScmRepositoryFactoryResolver', () => {
         statusText: 'Not Found',
       });
 
+      // Repo is public (GitHub API repo lookup)
+      (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
+        status: 200,
+        data: {},
+      });
+
       // Second attempt (.devfile.yaml) succeeds
       const devfileContent = JSON.stringify({
         schemaVersion: '2.1.0',
@@ -384,14 +397,12 @@ describe('ScmRepositoryFactoryResolver', () => {
 
       const parameters = {
         [FACTORY_CONSTANTS.URL_PARAMETER_NAME]: 'https://github.com/user/repo',
-        // Add authorization to avoid UnauthorizedException on first 404
-        authorization: 'Bearer test-token',
       };
 
       const factory = (await resolver.createFactory(parameters)) as FactoryDevfileV2;
 
       expect(factory).toBeDefined();
-      expect(axiosInstanceNoCert.get).toHaveBeenCalledTimes(2);
+      expect(axiosInstanceNoCert.get).toHaveBeenCalledTimes(3);
     });
 
     it('should throw error if URL is missing', async () => {
@@ -403,9 +414,23 @@ describe('ScmRepositoryFactoryResolver', () => {
     });
 
     it('should return basic factory when no devfile found (404) without authorization', async () => {
-      // All attempts fail with 404 - for public repos, this means no devfile exists
-      // We should return a basic factory, not throw auth error
-      (axiosInstanceNoCert.get as jest.Mock).mockResolvedValue({
+      // All attempts fail with 404. For public repos this means no devfile exists.
+      // We should return a basic factory, not throw an auth error.
+      //
+      // 1) devfile.yaml -> 404
+      (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
+        status: 404,
+        statusText: 'Not Found',
+      });
+
+      // 2) Repo is public (GitHub API repo lookup)
+      (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
+        status: 200,
+        data: {},
+      });
+
+      // 3) .devfile.yaml -> 404
+      (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
         status: 404,
         statusText: 'Not Found',
       });
@@ -632,6 +657,13 @@ components:
       const parsed = resolver.parseFactoryUrl(url);
 
       expect(parsed.branch).toBe('feature-branch');
+    });
+
+    it('should parse Git SSH URL (git@host:org/repo.git)', () => {
+      const url = 'git@github.com:olexii4/STM32-inductor-analyzer.git';
+      const parsed = resolver.parseFactoryUrl(url);
+
+      expect(parsed.providerUrl).toBe('https://github.com');
     });
 
     it('should throw error for invalid URL', () => {

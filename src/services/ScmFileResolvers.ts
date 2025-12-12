@@ -106,8 +106,62 @@ export class GenericScmFileResolver implements ScmFileResolver {
  * Based on: org.eclipse.che.api.factory.server.github.GithubScmFileResolver
  */
 export class GitHubFileResolver implements ScmFileResolver {
+  private publicRepoCache: Map<string, boolean> = new Map();
+
   accept(repository: string): boolean {
     return repository.includes('github.com') || repository.includes('github');
+  }
+
+  private extractOwnerRepo(repository: string): { owner: string; repo: string } | null {
+    // git@github.com:owner/repo(.git)
+    if (repository.startsWith('git@')) {
+      const m = repository.match(/^git@github\.com:([^/]+)\/(.+?)(?:\.git)?$/);
+      if (m) {
+        return { owner: m[1], repo: m[2] };
+      }
+    }
+
+    // https://github.com/owner/repo...
+    try {
+      const u = new URL(repository);
+      if (u.hostname !== 'github.com') return null;
+      const parts = u.pathname.split('/').filter(Boolean);
+      if (parts.length >= 2) {
+        const repo = parts[1].endsWith('.git') ? parts[1].slice(0, -4) : parts[1];
+        return { owner: parts[0], repo };
+      }
+    } catch {
+      // ignore
+    }
+
+    return null;
+  }
+
+  /**
+   * Determine whether repository is public by querying GitHub API without auth.
+   * Public repos return 200; private/non-existent repos return 404.
+   */
+  private async isPublicRepo(repository: string): Promise<boolean> {
+    const cached = this.publicRepoCache.get(repository);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const ownerRepo = this.extractOwnerRepo(repository);
+    if (!ownerRepo) {
+      this.publicRepoCache.set(repository, false);
+      return false;
+    }
+
+    const apiUrl = `https://api.github.com/repos/${ownerRepo.owner}/${ownerRepo.repo}`;
+    const resp = await axiosInstanceNoCert.get(apiUrl, {
+      headers: { 'User-Agent': 'che-server' },
+      validateStatus: () => true,
+    });
+
+    const isPublic = resp.status === 200;
+    this.publicRepoCache.set(repository, isPublic);
+    return isPublic;
   }
 
   /**
@@ -262,9 +316,17 @@ export class GitHubFileResolver implements ScmFileResolver {
 
     if (axiosResponse.status === 404) {
       if (!authorization) {
-        // No auth + 404 = might be private repo
+        // 404 without authorization can mean either:
+        // - file doesn't exist in a public repo, OR
+        // - repo is private and requires OAuth
+        // Disambiguate via unauthenticated GitHub API repo lookup.
+        const isPublic = await this.isPublicRepo(repository);
+        if (isPublic) {
+          throw new Error(SCM_CONSTANTS.ERRORS.FILE_NOT_FOUND);
+        }
+
         logger.info(
-          `[GitHubFileResolver] 404 without authorization - treating as potential private repository`,
+          `[GitHubFileResolver] 404 without authorization - treating as private repository (OAuth required)`,
         );
         const oauthProvider = 'github';
         const authenticateUrl = buildOAuthAuthenticateUrl(
