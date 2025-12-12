@@ -1,10 +1,35 @@
 # Eclipse Che Server (TypeScript) Documentation
 
-This directory contains detailed implementation guides for the TypeScript/Fastify che-server, comparing it with the original Eclipse Che Java implementation.
+This directory contains implementation notes for the TypeScript/Fastify `che-server`, comparing it with the original Eclipse Che **Java che-server** implementation.
 
 ## Architecture Overview
 
-The che-server is a high-performance TypeScript reimplementation of a **subset** of the Eclipse Che Server REST APIs.
+The che-server is a TypeScript reimplementation of a **small subset** of the Eclipse Che Server REST APIs.
+
+## Current status (what is real today)
+
+- **Supported API surface** (current Node implementation):
+  - `POST /api/kubernetes/namespace/provision`
+  - `GET /api/kubernetes/namespace`
+  - `POST /api/factory/resolver`
+  - `POST /api/factory/token/refresh`
+  - `GET /api/oauth`
+  - `GET /api/oauth/token`
+  - `DELETE /api/oauth/token`
+  - `GET /api/oauth/authenticate`
+  - `GET /api/oauth/callback`
+  - `GET /api/scm/resolve`
+  - `GET /api/system/state`
+  - `GET /api/user/id` *(dashboard compatibility)*
+
+- **Authentication model**:
+  - Preferred: **gateway identity headers** (`gap-auth` and common `x-forwarded-*` identity headers)
+  - Fallbacks: test/basic formats for local/dev
+  - **TokenReview is not used** (avoids cluster-wide RBAC requirements)
+
+- **RBAC note**:
+  - This repo does **not** require adding cluster-wide RBAC objects for an “image-only replacement”.
+  - User RoleBindings are only created when `CHE_INFRA_KUBERNETES_USER_CLUSTER_ROLES` is explicitly set (matches Java).
 
 ### Key Architectural Patterns
 
@@ -34,7 +59,7 @@ The che-server is a high-performance TypeScript reimplementation of a **subset**
 |--------|-------------|
 | `yarn patch` | Build, push, and patch CheCluster with new image |
 | `yarn build:multiarch` | Build multi-architecture Docker images |
-| `./scripts/setup-rbac.sh` | Set up RBAC for che-server ServiceAccount |
+| `yarn deploy:openshift` | Deploy/patch Eclipse Che on OpenShift (helper) |
 
 ## Documentation Files
 
@@ -382,5 +407,5 @@ All implementation guides follow these standards:
 
 ---
 
-**Last Updated**: December 10, 2025
+**Last Updated**: December 12, 2025
 

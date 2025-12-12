@@ -1527,11 +1527,11 @@ https://github.com/login/oauth/authorize?client_id=che-client&redirect_uri=http:
 |---------|---------------------|---------------------------|
 | **Provider Configuration** | Kubernetes Secrets | ✅ Kubernetes Secrets (with enhancement) |
 | **Empty Array Response** | ✅ When no secrets configured | ✅ When no secrets configured |
-| **Token Storage** | PostgreSQL/MongoDB persistent | In-memory volatile |
+| **Token Storage** | Persistent (server-side) | ✅ Stored as Kubernetes Secret (oauth2-* PAT) when user namespace is known; fallback to in-memory otherwise |
 | **Token Refresh** | Automatic with refresh_token | Manual only |
 | **Provider Discovery** | Automatic from labeled Secrets | ✅ Automatic from labeled Secrets (with enhancement) |
 | **Token Encryption** | Encrypted at rest | Plain text in memory |
-| **Code Exchange** | Full implementation | Stub/TODO |
+| **Code Exchange** | Full implementation | ✅ Implemented |
 | **Multi-instance** | Cluster-safe (database) | Single-instance only |
 | **Production Config** | ✅ Yes | ✅ Yes (with Kubernetes Secret support) |
 | **Link Format** | Enhanced with parameters | ✅ Enhanced with parameters (configurable) |

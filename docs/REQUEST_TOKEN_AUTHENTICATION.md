@@ -1,6 +1,18 @@
-# Service Account Token Authentication for Kubernetes
+# Request token authentication (historical) / Current Che Gateway auth notes
 
-## Overview
+## Status
+
+This document was originally written to explore a **request-token** model (dashboard-backend style).
+
+**Current che-server behavior (as deployed today)**:
+
+- **Identity** comes from Che Gateway headers (`gap-auth` and common `x-forwarded-*` identity headers).
+- **Kubernetes API operations** are performed using in-cluster credentials (service account kubeconfig).
+- **TokenReview is not used** (avoids cluster-wide RBAC requirements).
+
+The rest of this document is kept as **historical/reference material** and may not match current behavior line-by-line.
+
+## Original overview (historical)
 
 This document explains how the che-server TypeScript implementation uses **service account tokens** for Kubernetes API operations, while still using user tokens from incoming HTTP requests for authentication and user identification.
 
