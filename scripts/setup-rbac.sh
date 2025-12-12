@@ -51,6 +51,11 @@ rules:
 - apiGroups: [""]
   resources: ["namespaces"]
   verbs: ["get", "list", "watch", "create", "update", "patch"]
+# Allow reading CheCluster CR (Che Operator configuration source)
+# Needed for CheClusterService.getNamespacedCustomObject('org.eclipse.che', 'v2', ..., 'checlusters', ...)
+- apiGroups: ["org.eclipse.che"]
+  resources: ["checlusters"]
+  verbs: ["get", "list", "watch"]
 EOF
 
 # Create ClusterRoleBinding
