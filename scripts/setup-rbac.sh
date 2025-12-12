@@ -43,14 +43,6 @@ rules:
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["rolebindings"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-# Allow validating user tokens via Kubernetes TokenReview API (OpenShift/Kubernetes bearer tokens)
-- apiGroups: ["authentication.k8s.io"]
-  resources: ["tokenreviews"]
-  verbs: ["create"]
-# (Optional) Allow SubjectAccessReview if needed in future auth flows
-- apiGroups: ["authorization.k8s.io"]
-  resources: ["subjectaccessreviews"]
-  verbs: ["create"]
 # Allow managing secrets in user namespaces (for user-profile)
 - apiGroups: [""]
   resources: ["secrets"]
@@ -68,30 +60,6 @@ rules:
 - apiGroups: ["org.eclipse.che"]
   resources: ["checlusters"]
   verbs: ["get", "list", "watch"]
-EOF
-
-# Ensure the default user ClusterRole exists (used when creating RoleBindings in user namespaces)
-# Some OpenShift installs may not create it by default.
-cat <<EOF | kubectl apply -f -
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: che-user-namespace-access
-  labels:
-    app.kubernetes.io/part-of: che.eclipse.org
-    app.kubernetes.io/component: user-permission
-rules:
-  # DevWorkspaces (Che workspaces on Kubernetes/OpenShift)
-  - apiGroups: ["workspace.devfile.io"]
-    resources: ["devworkspaces", "devworkspacetemplates", "devworkspaceroutings"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  # Basic namespace resources needed by the dashboard / user workflows
-  - apiGroups: [""]
-    resources: ["pods", "events"]
-    verbs: ["get", "list", "watch"]
-  - apiGroups: [""]
-    resources: ["secrets", "configmaps"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 EOF
 
 # Create ClusterRoleBinding
@@ -118,7 +86,6 @@ echo "[SUCCESS] RBAC permissions configured successfully!"
 echo ""
 echo "The che-server ServiceAccount can now:"
 echo "  - Create/manage RoleBindings in user namespaces"
-echo "  - Call TokenReview API (create tokenreviews) to map bearer tokens to usernames"
 echo "  - Create/manage Secrets (user-profile) in user namespaces"
 echo "  - Create/manage Namespaces"
 echo ""
