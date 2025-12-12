@@ -127,7 +127,15 @@ export class BitbucketServerOAuth1Authenticator {
     this.requestTokenUri = `${bitbucketEndpoint}/plugins/servlet/oauth/request-token`;
     this.accessTokenUri = `${bitbucketEndpoint}/plugins/servlet/oauth/access-token`;
     this.authorizeTokenUri = `${bitbucketEndpoint}/plugins/servlet/oauth/authorize`;
-    this.redirectUri = `${apiEndpoint}/api/oauth/1.0/callback`;
+    // Java builds callback using {che.api} which typically already ends with "/api"
+    // (e.g. http://localhost:8080/api). Ensure we don't accidentally create "/api/api/...".
+    const apiBase = ensureApiBase(apiEndpoint);
+    this.redirectUri = `${apiBase}/oauth/1.0/callback`;
+  }
+
+  getLocalAuthenticateUrl(): string {
+    const apiBase = ensureApiBase(this.apiEndpoint);
+    return `${apiBase}/oauth/1.0/authenticate?oauth_provider=${BitbucketServerOAuth1Authenticator.NAME}&request_method=POST&signature_method=rsa`;
   }
 
   getEndpointUrl(): string {
@@ -326,7 +334,9 @@ export class OAuth1Service {
     const bitbucketEndpoint = process.env.CHE_OAUTH_BITBUCKET_ENDPOINT;
 
     const apiEndpoint =
-      process.env.CHE_API || process.env.CHE_API_ENDPOINT || `http://localhost:${process.env.PORT || 8080}`;
+      process.env.CHE_API ||
+      process.env.CHE_API_ENDPOINT ||
+      `http://localhost:${process.env.PORT || 8080}/api`;
 
     if (!isNonEmptyString(consumerKeyPath) || !isNonEmptyString(privateKeyPath) || !isNonEmptyString(bitbucketEndpoint)) {
       logger.info(
@@ -367,6 +377,21 @@ export class OAuth1Service {
     }
     return undefined;
   }
+}
+
+function ensureApiBase(apiEndpoint: string): string {
+  let base = apiEndpoint.endsWith('/') ? apiEndpoint.slice(0, -1) : apiEndpoint;
+  if (base.endsWith('/api')) {
+    return base;
+  }
+  return `${base}/api`;
+}
+
+const oauth1ServiceSingleton = new OAuth1Service();
+oauth1ServiceSingleton.initialize();
+
+export function getOAuth1Service(): OAuth1Service {
+  return oauth1ServiceSingleton;
 }
 
 

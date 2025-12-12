@@ -88,6 +88,33 @@ export function buildOAuthAuthenticateUrl(
 }
 
 /**
+ * Helper function to build OAuth 1.0 authentication URL (Bitbucket Server).
+ *
+ * Java reference:
+ * - BitbucketServerOAuthAuthenticator.getLocalAuthenticateUrl()
+ *   => {che.api}/oauth/1.0/authenticate?oauth_provider=bitbucket-server&request_method=POST&signature_method=rsa
+ */
+export function buildOAuth1AuthenticateUrl(
+  apiEndpoint: string,
+  oauthProvider: string = 'bitbucket-server',
+  requestMethod: string = 'POST',
+  signatureMethod: string = 'rsa',
+): string {
+  const params = new URLSearchParams({
+    oauth_provider: oauthProvider,
+    request_method: requestMethod,
+    signature_method: signatureMethod,
+  });
+
+  let baseUrl = apiEndpoint.endsWith('/') ? apiEndpoint.slice(0, -1) : apiEndpoint;
+  if (!baseUrl.endsWith('/api')) {
+    baseUrl = `${baseUrl}/api`;
+  }
+
+  return `${baseUrl}/oauth/1.0/authenticate?${params.toString()}`;
+}
+
+/**
  * Detect OAuth provider from repository URL
  */
 export function detectOAuthProvider(repositoryUrl: string): string {

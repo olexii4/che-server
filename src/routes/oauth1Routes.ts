@@ -12,7 +12,7 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
-  OAuth1Service,
+  getOAuth1Service,
   OAuth1AuthenticationException,
   UserDeniedOAuthAuthenticationException,
   getRedirectAfterLoginUrl,
@@ -30,8 +30,7 @@ function queryMapFromState(state: string): Map<string, string> {
 }
 
 export async function registerOAuth1Routes(fastify: FastifyInstance): Promise<void> {
-  const oauth1Service = new OAuth1Service();
-  oauth1Service.initialize();
+  const oauth1Service = getOAuth1Service();
 
   /**
    * GET /api/oauth/1.0/authenticate

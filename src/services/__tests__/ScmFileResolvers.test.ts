@@ -31,6 +31,13 @@ jest.mock('../../helpers/getCertificateAuthority', () => ({
   },
 }));
 
+// Prevent tests from exiting when not running in a Kubernetes pod.
+jest.mock('../../helpers/getServiceAccountToken', () => ({
+  getServiceAccountToken: () => '',
+  isLocalRun: () => true,
+  SERVICE_ACCOUNT_TOKEN_PATH: '/run/secrets/kubernetes.io/serviceaccount/token',
+}));
+
 import { axiosInstanceNoCert, axiosInstance } from '../../helpers/getCertificateAuthority';
 
 describe('GitHubFileResolver', () => {
@@ -78,6 +85,13 @@ describe('GitHubFileResolver', () => {
         statusText: 'Not Found',
       });
 
+      // GitHub public/private disambiguation call (repo lookup).
+      // Simulate private repo (404) so resolver throws UnauthorizedException.
+      (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
+        status: 404,
+        data: {},
+      });
+
       await expect(
         resolver.fileContent('https://github.com/user/repo', 'missing.md'),
       ).rejects.toThrow(UnauthorizedException);
@@ -114,7 +128,7 @@ describe('GitHubFileResolver', () => {
         statusText: 'Not Found',
       });
 
-      await expect(resolver.fileContent('https://github.com/user/repo')).rejects.toThrow(
+      await expect(resolver.fileContent('https://github.com/user/repo', '')).rejects.toThrow(
         UnauthorizedException,
       );
     });
@@ -135,7 +149,7 @@ describe('GitHubFileResolver', () => {
 
       const content = await resolver.fileContent(
         'https://github.com/user/repo',
-        undefined,
+        '',
         'Bearer token',
       );
 
@@ -147,7 +161,7 @@ describe('GitHubFileResolver', () => {
       (axiosInstance.get as jest.Mock).mockRejectedValue(new Error('Network error'));
 
       await expect(
-        resolver.fileContent('https://github.com/user/repo', undefined, 'Bearer token'),
+        resolver.fileContent('https://github.com/user/repo', '', 'Bearer token'),
       ).rejects.toThrow();
     });
   });
@@ -255,7 +269,7 @@ describe('GitLabFileResolver', () => {
 
       const content = await resolver.fileContent(
         'https://gitlab.com/user/repo',
-        undefined,
+        '',
         'Bearer token',
       );
 
@@ -268,7 +282,7 @@ describe('GitLabFileResolver', () => {
         statusText: 'Not Found',
       });
 
-      await expect(resolver.fileContent('https://gitlab.com/user/repo')).rejects.toThrow(
+      await expect(resolver.fileContent('https://gitlab.com/user/repo', '')).rejects.toThrow(
         UnauthorizedException,
       );
     });
@@ -359,7 +373,7 @@ describe('BitbucketFileResolver', () => {
 
       const content = await resolver.fileContent(
         'https://bitbucket.org/workspace/repo',
-        undefined,
+        '',
         'Bearer token',
       );
 
@@ -372,7 +386,7 @@ describe('BitbucketFileResolver', () => {
         statusText: 'Not Found',
       });
 
-      await expect(resolver.fileContent('https://bitbucket.org/workspace/repo')).rejects.toThrow(
+      await expect(resolver.fileContent('https://bitbucket.org/workspace/repo', '')).rejects.toThrow(
         UnauthorizedException,
       );
     });
@@ -555,7 +569,7 @@ describe('AzureDevOpsFileResolver', () => {
       });
 
       await expect(
-        resolver.fileContent('https://dev.azure.com/org/project/_git/repo'),
+        resolver.fileContent('https://dev.azure.com/org/project/_git/repo', ''),
       ).rejects.toThrow(UnauthorizedException);
     });
   });

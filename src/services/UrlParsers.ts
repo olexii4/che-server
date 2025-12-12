@@ -375,7 +375,8 @@ export class BitbucketUrl implements RemoteFactoryUrl {
         `[BitbucketUrl.parse] URL object`,
       );
 
-      if (!normalizedUrl.includes('bitbucket.org') && !normalizedUrl.includes('bitbucket')) {
+      // Bitbucket Cloud only (avoid matching Bitbucket Server which often includes "bitbucket" in hostname)
+      if (!normalizedUrl.includes('bitbucket.org') && !normalizedUrl.includes('api.bitbucket.org')) {
         return null;
       }
 
@@ -433,6 +434,118 @@ export class BitbucketUrl implements RemoteFactoryUrl {
 }
 
 /**
+ * Bitbucket Server URL parser and handler (self-hosted)
+ *
+ * Based on: org.eclipse.che.api.factory.server.bitbucket.BitbucketServerURLParser
+ */
+export class BitbucketServerUrl implements RemoteFactoryUrl {
+  providerName = 'bitbucket-server';
+  providerUrl: string;
+  serverUrl: string;
+  project?: string;
+  user?: string;
+  repository: string;
+  branch: string;
+  devfileFilenames: string[];
+
+  constructor(
+    serverUrl: string,
+    repository: string,
+    branch: string = 'HEAD',
+    devfileFilenames: string[] = DEFAULT_DEVFILE_FILENAMES,
+    project?: string,
+    user?: string,
+  ) {
+    this.serverUrl = serverUrl;
+    this.providerUrl = serverUrl;
+    this.repository = repository;
+    this.branch = branch;
+    this.devfileFilenames = devfileFilenames;
+    this.project = project;
+    this.user = user;
+  }
+
+  devfileFileLocations(): DevfileLocation[] {
+    return this.devfileFilenames.map(filename => ({
+      filename,
+      location: this.rawFileLocation(filename),
+    }));
+  }
+
+  rawFileLocation(filename: string): string {
+    const at = this.branch && this.branch !== 'HEAD' ? `?at=${encodeURIComponent(this.branch)}` : '';
+    if (this.project) {
+      return `${this.serverUrl}/rest/api/1.0/projects/${encodeURIComponent(this.project)}/repos/${encodeURIComponent(this.repository)}/raw/${filename}${at}`;
+    }
+    if (this.user) {
+      return `${this.serverUrl}/rest/api/1.0/users/${encodeURIComponent(this.user)}/repos/${encodeURIComponent(this.repository)}/raw/${filename}${at}`;
+    }
+    // Fallback (unknown layout)
+    return `${this.serverUrl}/rest/api/1.0/projects/${encodeURIComponent('')}/repos/${encodeURIComponent(this.repository)}/raw/${filename}${at}`;
+  }
+
+  static parse(
+    url: string,
+    devfileFilenames: string[] = DEFAULT_DEVFILE_FILENAMES,
+  ): BitbucketServerUrl | null {
+    try {
+      let normalizedUrl = url;
+      // ssh://git@host:port/... -> https://host
+      if (normalizedUrl.startsWith('ssh://git@')) {
+        const rest = normalizedUrl.substring('ssh://git@'.length);
+        const host = rest.substring(0, rest.includes(':') ? rest.indexOf(':') : rest.indexOf('/'));
+        // Best-effort: Bitbucket Server is typically https
+        normalizedUrl = `https://${host}${rest.includes('/') ? rest.substring(rest.indexOf('/')) : ''}`;
+      }
+
+      const urlObj = new URL(normalizedUrl);
+      const serverUrl = `${urlObj.protocol}//${urlObj.host}`;
+      const path = urlObj.pathname;
+      const pathParts = path.split('/').filter(Boolean);
+      const branch = urlObj.searchParams.get('at') || 'HEAD';
+
+      // /scm/~user/repo.git
+      if (pathParts[0] === 'scm' && pathParts.length >= 3) {
+        const owner = pathParts[1];
+        let repo = pathParts[2];
+        if (repo.endsWith('.git')) repo = repo.slice(0, -4);
+        if (owner.startsWith('~')) {
+          return new BitbucketServerUrl(serverUrl, repo, branch, devfileFilenames, undefined, owner.slice(1));
+        }
+        return new BitbucketServerUrl(serverUrl, repo, branch, devfileFilenames, owner, undefined);
+      }
+
+      // /projects/<project>/repos/<repo>/browse
+      if (pathParts[0] === 'projects') {
+        const projectIdx = 1;
+        const reposIdx = pathParts.indexOf('repos');
+        if (reposIdx > 0 && pathParts.length > reposIdx + 1) {
+          const project = pathParts[projectIdx];
+          const repo = pathParts[reposIdx + 1];
+          return new BitbucketServerUrl(serverUrl, repo, branch, devfileFilenames, project, undefined);
+        }
+      }
+
+      // /users/<user>/repos/<repo>/browse
+      if (pathParts[0] === 'users') {
+        const userIdx = 1;
+        const reposIdx = pathParts.indexOf('repos');
+        if (reposIdx > 0 && pathParts.length > reposIdx + 1) {
+          const user = pathParts[userIdx];
+          const repo = pathParts[reposIdx + 1];
+          return new BitbucketServerUrl(serverUrl, repo, branch, devfileFilenames, undefined, user);
+        }
+      }
+
+      return null;
+    } catch (error) {
+      logger.error({ error }, '[BitbucketServerUrl.parse] Error parsing Bitbucket Server URL');
+      return null;
+    }
+  }
+}
+
+/**
  * URL Parser Service
  * Attempts to parse various SCM URLs and return appropriate URL handler
  */
@@ -455,6 +568,12 @@ export class UrlParserService {
     const gitlabUrl = GitlabUrl.parse(url, devfileFilenames);
     if (gitlabUrl) {
       return gitlabUrl;
+    }
+
+    // Try Bitbucket Server (self-hosted)
+    const bitbucketServerUrl = BitbucketServerUrl.parse(url, devfileFilenames);
+    if (bitbucketServerUrl) {
+      return bitbucketServerUrl;
     }
 
     // Try Bitbucket

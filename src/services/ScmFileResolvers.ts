@@ -11,11 +11,12 @@
  */
 
 import { ScmFileResolver, SCM_CONSTANTS } from '../models/ScmModels';
-import { UrlParserService } from './UrlParsers';
+import { UrlParserService, BitbucketServerUrl } from './UrlParsers';
 import { DEFAULT_DEVFILE_FILENAMES } from './FactoryParametersResolver';
 import {
   UnauthorizedException,
   buildOAuthAuthenticateUrl,
+  buildOAuth1AuthenticateUrl,
   isAuthenticationError,
 } from '../models/UnauthorizedException';
 import { axiosInstance, axiosInstanceNoCert } from '../helpers/getCertificateAuthority';
@@ -28,6 +29,128 @@ import { PatLookupService, PatInfo } from './PatLookupService';
 export interface UserContext {
   namespace?: string;
   userId?: string;
+}
+
+/**
+ * Bitbucket Server (self-hosted) File Resolver
+ *
+ * Java reference:
+ * - org.eclipse.che.api.factory.server.bitbucket.HttpBitbucketServerApiClient
+ * - org.eclipse.che.api.factory.server.bitbucket.BitbucketServerURLParser
+ *
+ * Key behavior:
+ * - If unauthorized, throw ScmUnauthorizedException with oauth_provider="bitbucket" and oauth_version="1.0"
+ * - Provide authenticate URL for OAuth1:
+ *   {che.api}/oauth/1.0/authenticate?oauth_provider=bitbucket-server&request_method=POST&signature_method=rsa
+ */
+export class BitbucketServerFileResolver implements ScmFileResolver {
+  accept(repository: string): boolean {
+    const parsed = UrlParserService.parse(repository);
+    return parsed instanceof BitbucketServerUrl;
+  }
+
+  async fileContent(
+    repository: string,
+    filePath: string,
+    authorization?: string,
+    userContext?: UserContext,
+  ): Promise<string> {
+    const parsed = UrlParserService.parse(repository);
+    if (!(parsed instanceof BitbucketServerUrl)) {
+      throw new Error(`Invalid Bitbucket Server repository URL: ${repository}`);
+    }
+
+    const tryLocations = (filePath && filePath.trim().length > 0)
+      ? [{ filename: filePath, location: parsed.rawFileLocation(filePath) }]
+      : parsed.devfileFileLocations();
+
+    const errors: string[] = [];
+    for (const location of tryLocations) {
+      try {
+        const content = await this.fetchFromUrl(location.location, authorization, userContext);
+        return content;
+      } catch (error: any) {
+        if (error instanceof UnauthorizedException) {
+          throw error;
+        }
+        errors.push(`${location.filename}: ${error.message}`);
+      }
+    }
+
+    throw new Error(
+      `No devfile found. Tried: ${tryLocations.map(l => l.filename).join(', ')}. Errors: ${errors.join('; ')}`,
+    );
+  }
+
+  private async fetchFromUrl(
+    rawUrl: string,
+    authorization?: string,
+    userContext?: UserContext,
+  ): Promise<string> {
+    const headers: Record<string, string> = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET',
+    };
+
+    if (authorization) {
+      headers['Authorization'] = authorization;
+    } else if (userContext?.userId) {
+      // OAuth1 signature fallback (requires OAuth1 flow to be completed)
+      try {
+        const { getOAuth1Service, BitbucketServerOAuth1Authenticator } = await import('./OAuth1Service');
+        const oauth1 = getOAuth1Service();
+        const auth = oauth1.getAuthenticator(BitbucketServerOAuth1Authenticator.NAME);
+        if (!auth) {
+          throw new Error('OAuth1 provider not configured');
+        }
+        headers['Authorization'] = auth.computeAuthorizationHeader(userContext.userId, 'GET', rawUrl);
+      } catch {
+        const apiEndpoint =
+          process.env.CHE_API || process.env.CHE_API_ENDPOINT || 'http://localhost:8080';
+        throw new UnauthorizedException(
+          `${userContext.userId} is not authorized in bitbucket OAuth provider`,
+          'bitbucket',
+          '1.0',
+          buildOAuth1AuthenticateUrl(apiEndpoint, 'bitbucket-server', 'POST', 'rsa'),
+        );
+      }
+    } else {
+      const apiEndpoint =
+        process.env.CHE_API || process.env.CHE_API_ENDPOINT || 'http://localhost:8080';
+      throw new UnauthorizedException(
+        `User is not authorized in bitbucket OAuth provider`,
+        'bitbucket',
+        '1.0',
+        buildOAuth1AuthenticateUrl(apiEndpoint, 'bitbucket-server', 'POST', 'rsa'),
+      );
+    }
+
+    const config = { headers, validateStatus: () => true };
+    let resp;
+    try {
+      resp = await axiosInstanceNoCert.get(rawUrl, config);
+    } catch {
+      resp = await axiosInstance.get(rawUrl, config);
+    }
+
+    if (resp.status === 401 || resp.status === 403) {
+      const apiEndpoint =
+        process.env.CHE_API || process.env.CHE_API_ENDPOINT || 'http://localhost:8080';
+      throw new UnauthorizedException(
+        `${userContext?.userId || 'user'} is not authorized in bitbucket OAuth provider`,
+        'bitbucket',
+        '1.0',
+        buildOAuth1AuthenticateUrl(apiEndpoint, 'bitbucket-server', 'POST', 'rsa'),
+      );
+    }
+    if (resp.status === 404) {
+      throw new Error(SCM_CONSTANTS.ERRORS.FILE_NOT_FOUND);
+    }
+    if (resp.status !== 200) {
+      throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+    }
+    return resp.data;
+  }
 }
 
 /**
@@ -45,7 +168,12 @@ export class GenericScmFileResolver implements ScmFileResolver {
     }
   }
 
-  async fileContent(repository: string, filePath: string, authorization?: string): Promise<string> {
+  async fileContent(
+    repository: string,
+    filePath: string,
+    authorization?: string,
+    _userContext?: UserContext,
+  ): Promise<string> {
     try {
       // Try to fetch the file directly
       const fileUrl = this.buildFileUrl(repository, filePath);
@@ -172,6 +300,7 @@ export class GitHubFileResolver implements ScmFileResolver {
     repository: string,
     filePath?: string,
     authorization?: string,
+    _userContext?: UserContext,
   ): Promise<string> {
     try {
       // If specific file path is provided, fetch it directly
@@ -495,6 +624,7 @@ export class GitLabFileResolver implements ScmFileResolver {
     repository: string,
     filePath?: string,
     authorization?: string,
+    _userContext?: UserContext,
   ): Promise<string> {
     try {
       // If specific file path is provided, fetch it directly
@@ -714,6 +844,7 @@ export class BitbucketFileResolver implements ScmFileResolver {
     repository: string,
     filePath?: string,
     authorization?: string,
+    _userContext?: UserContext,
   ): Promise<string> {
     logger.info(`[BitbucketFileResolver] ========== fileContent called ==========`);
     logger.info(`[BitbucketFileResolver]   repository: ${repository}`);
@@ -1164,6 +1295,7 @@ export class AzureDevOpsFileResolver implements ScmFileResolver {
     repository: string,
     filePath?: string,
     authorization?: string,
+    _userContext?: UserContext,
   ): Promise<string> {
     logger.info(`[AzureDevOpsFileResolver] ========== fileContent called ==========`);
     logger.info(`[AzureDevOpsFileResolver]   repository: ${repository}`);
@@ -1416,6 +1548,7 @@ export class ScmService {
 
   constructor() {
     // Register default resolvers
+    this.registerResolver(new BitbucketServerFileResolver());
     this.registerResolver(new GitHubFileResolver());
     this.registerResolver(new GitLabFileResolver());
     this.registerResolver(new BitbucketFileResolver());
@@ -1473,6 +1606,9 @@ export class ScmService {
         if (provider === 'bitbucket') {
           // Bitbucket prefers Basic auth with x-token-auth:token
           authorization = `Basic ${Buffer.from(`x-token-auth:${pat.tokenData}`).toString('base64')}`;
+        } else if (provider === 'bitbucket-server') {
+          // Bitbucket Server uses Bearer tokens
+          authorization = `Bearer ${pat.tokenData}`;
         } else {
           // GitHub, GitLab, Azure DevOps use Bearer tokens
           authorization = `Bearer ${pat.tokenData}`;
@@ -1489,7 +1625,7 @@ export class ScmService {
 
     // Resolve file content
     // If filePath is empty or undefined, the resolver will try default devfile filenames
-    return await resolver.fileContent(repository, filePath || '', authorization);
+    return await resolver.fileContent(repository, filePath || '', authorization, userContext);
   }
 
   /**

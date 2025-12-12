@@ -251,6 +251,18 @@ export class PatLookupService {
     if (url.includes('gitlab.com') || url.includes('gitlab')) {
       return 'gitlab';
     }
+    // Bitbucket Server (self-hosted) typically uses URLs like:
+    // - https://host/scm/<project>/<repo>.git
+    // - https://host/projects/<project>/repos/<repo>/browse
+    // - https://host/users/<user>/repos/<repo>/browse
+    if (
+      (url.includes('/scm/') || url.includes('/projects/') || url.includes('/users/')) &&
+      url.includes('bitbucket') &&
+      !url.includes('bitbucket.org') &&
+      !url.includes('api.bitbucket.org')
+    ) {
+      return 'bitbucket-server';
+    }
     if (url.includes('bitbucket.org') || url.includes('bitbucket')) {
       return 'bitbucket';
     }
