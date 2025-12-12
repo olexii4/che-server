@@ -17,6 +17,7 @@ import { authenticate, requireAuth } from './middleware/auth';
 import { registerNamespaceRoutes } from './routes/namespaceRoutes';
 import { registerFactoryRoutes } from './routes/factoryRoutes';
 import { registerOAuthRoutes } from './routes/oauthRoutes';
+import { registerOAuth1Routes } from './routes/oauth1Routes';
 import { registerScmRoutes } from './routes/scmRoutes';
 import { registerSystemRoutes } from './routes/systemRoutes';
 import { registerUserRoutes } from './routes/userRoutes';
@@ -121,6 +122,7 @@ async function start() {
         await registerNamespaceRoutes(apiInstance);
         await registerFactoryRoutes(apiInstance);
         await registerOAuthRoutes(apiInstance);
+        await registerOAuth1Routes(apiInstance);
         await registerScmRoutes(apiInstance);
         await registerSystemRoutes(apiInstance);
         await registerUserRoutes(apiInstance);

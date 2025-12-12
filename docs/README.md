@@ -18,6 +18,9 @@ The che-server is a TypeScript reimplementation of a **small subset** of the Ecl
   - `DELETE /api/oauth/token`
   - `GET /api/oauth/authenticate`
   - `GET /api/oauth/callback`
+  - `GET /api/oauth/1.0/authenticate` *(OAuth 1.0a, Bitbucket Server)*
+  - `GET /api/oauth/1.0/callback` *(OAuth 1.0a, Bitbucket Server)*
+  - `GET /api/oauth/1.0/signature` *(OAuth 1.0a, Bitbucket Server)*
   - `GET /api/scm/resolve`
   - `GET /api/system/state`
   - `GET /api/user/id` *(dashboard compatibility)*
