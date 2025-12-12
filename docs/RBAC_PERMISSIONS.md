@@ -53,71 +53,9 @@ rules:
 
 **Why needed**: To create namespaces and update their labels/annotations.
 
-### `/api/namespace/:namespace/devworkspaces` (GET, POST, PATCH, DELETE)
-
-**Purpose**: Manage DevWorkspace Custom Resources
-
-**Required Permissions**:
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: devworkspace-admin
-rules:
-- apiGroups: ["workspace.devfile.io"]
-  resources: ["devworkspaces", "devworkspacetemplates", "devworkspaceroutings"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-- apiGroups: ["controller.devfile.io"]
-  resources: ["devworkspaceoperatorconfigs"]
-  verbs: ["get", "list", "watch"]
-```
-
-**Why needed**: To manage DevWorkspace CRDs across namespaces.
-
-**Error if missing**:
-```json
-{
-  "statusCode": 403,
-  "error": "Forbidden",
-  "message": "Unable to list devworkspaces: devworkspaces.workspace.devfile.io is forbidden: User \"admin\" cannot list resource \"devworkspaces\" in API group \"workspace.devfile.io\" in the namespace \"admin-che\""
-}
-```
-
-### `/api/namespace/:namespace/pods` (GET)
-
-**Purpose**: List pods in a namespace
-
-**Required Permissions**:
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: pod-reader
-rules:
-- apiGroups: [""]
-  resources: ["pods"]
-  verbs: ["get", "list", "watch"]
-```
-
-### `/api/namespace/:namespace/events` (GET)
-
-**Purpose**: List events in a namespace
-
-**Required Permissions**:
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: event-reader
-rules:
-- apiGroups: [""]
-  resources: ["events"]
-  verbs: ["get", "list", "watch"]
-```
-
 ## Example ClusterRole and ClusterRoleBinding
 
-For a user to use all Che API endpoints, you need permissions for namespaces, DevWorkspaces, pods, and events:
+For the che-server ServiceAccount to provision namespaces and configure RBAC + user-profile secrets, you need permissions for namespaces, rolebindings, and secrets:
 
 ```yaml
 ---
@@ -130,14 +68,11 @@ rules:
   resources: ["namespaces"]
   verbs: ["list", "get", "create", "patch", "update"]
 - apiGroups: [""]
-  resources: ["pods", "events", "secrets", "configmaps"]
+  resources: ["secrets"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-- apiGroups: ["workspace.devfile.io"]
-  resources: ["devworkspaces", "devworkspacetemplates", "devworkspaceroutings"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["rolebindings"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-- apiGroups: ["controller.devfile.io"]
-  resources: ["devworkspaceoperatorconfigs"]
-  verbs: ["get", "list", "watch"]
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1

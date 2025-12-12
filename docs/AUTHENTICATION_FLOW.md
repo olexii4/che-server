@@ -42,7 +42,7 @@ gap-auth: kubeadmin
 
 **Example:**
 ```http
-GET /api/user/id
+GET /api/kubernetes/namespace
 Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
@@ -259,20 +259,10 @@ User/Client → Che Server API (Direct)
 
 ---
 
-### Problem: User ID returns username instead of UUID
+### Note: User ID source depends on auth method
 
-**Expected behavior:**
-- JWT tokens: Returns UUID from `sub` claim
-- gap-auth / test tokens: Returns username as ID (no UUID available)
-
-**Example:**
-```bash
-# With JWT
-curl /api/user/id → "d4810a4f-169f-4da5-a8e0-d8dff7ecf959"
-
-# With gap-auth
-curl -H 'gap-auth: admin' /api/user/id → "admin"
-```
+- **JWT Bearer tokens**: `subject.userId` comes from the JWT `sub` claim (typically a UUID)
+- **gap-auth / test tokens**: `subject.userId` may be derived from username (no UUID available)
 
 ---
 

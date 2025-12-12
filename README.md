@@ -6,9 +6,13 @@ Modern TypeScript/Fastify implementation of Eclipse Che Server REST APIs - a **d
 
 ## Overview
 
-This is a high-performance reimplementation of the Eclipse Che Server using TypeScript and Fastify. It provides all the core REST APIs that power Eclipse Che, the Kubernetes-native IDE and developer collaboration platform.
+This is a high-performance reimplementation of a **subset** of the Eclipse Che Server REST APIs using TypeScript and Fastify.
 
-Built to align with the Eclipse Che Dashboard backend architecture, this server provides enterprise-ready APIs for workspace management, OAuth integration, factory resolution, and DevWorkspace operations.
+This repository focuses on the endpoints implemented in the original Java `che-server` for:
+- Kubernetes namespace provisioning
+- Factory resolution
+- OAuth integration
+- SCM file resolving
 
 ### Replaces Java Implementation
 
@@ -35,44 +39,17 @@ This TypeScript project replaces the Java-based Eclipse Che Server:
 
 ## Features
 
-### 1. Cluster & Server Configuration
-- ✅ GET `/api/cluster-info` - Get cluster console information
-- ✅ GET `/api/cluster-config` - Get cluster-wide configuration  
-- ✅ GET `/api/server-config` - Get server configuration (editors, plugins, timeouts)
-
-### 2. Kubernetes Namespace Management
+### 1. Kubernetes Namespace Management
 - ✅ POST `/api/kubernetes/namespace/provision` - Provision a namespace for authenticated users
 - ✅ GET `/api/kubernetes/namespace` - List available namespaces
 
 **📖 See [docs/NAMESPACE_PROVISIONING_IMPLEMENTATION.md](docs/NAMESPACE_PROVISIONING_IMPLEMENTATION.md) for detailed implementation guide.**
 
-### 3. DevWorkspace Management
-- ✅ GET `/api/namespace/:namespace/devworkspaces` - List DevWorkspaces
-- ✅ POST `/api/namespace/:namespace/devworkspaces` - Create DevWorkspace
-- ✅ GET `/api/namespace/:namespace/devworkspaces/:name` - Get specific DevWorkspace
-- ✅ PATCH `/api/namespace/:namespace/devworkspaces/:name` - Update DevWorkspace
-- ✅ DELETE `/api/namespace/:namespace/devworkspaces/:name` - Delete DevWorkspace
-- ✅ GET `/api/namespace/:namespace/devworkspacetemplates` - List DevWorkspaceTemplates
-- ✅ POST `/api/namespace/:namespace/devworkspacetemplates` - Create DevWorkspaceTemplate
-- ✅ GET `/api/namespace/:namespace/devworkspacetemplates/:name` - Get specific template
-- ✅ PATCH `/api/namespace/:namespace/devworkspacetemplates/:name` - Update template
-- ✅ POST `/api/devworkspace-resources` - Generate DevWorkspace YAML from devfile
-- ✅ GET `/api/devworkspace/running-workspaces-cluster-limit-exceeded` - Check cluster limits
-
-**📖 See [docs/DASHBOARD_BACKEND_API_IMPLEMENTATION.md](docs/DASHBOARD_BACKEND_API_IMPLEMENTATION.md) for DevWorkspace implementation details**
-
-### 4. Monitoring & Info APIs
-- ✅ GET `/api/namespace/:namespace/pods` - List pods in a namespace
-- ✅ GET `/api/namespace/:namespace/events` - List Kubernetes events  
-- ✅ GET `/api/editors` - List available editors/IDEs
-- ✅ GET `/api/editors/devfile?che-editor=<id>` - Get specific editor devfile (YAML)
-- ✅ GET `/api/userprofile/:namespace` - Get user profile (username, email)
-
-### 5. Factory Management
+### 2. Factory Management
 - ✅ POST `/api/factory/resolver` - Resolve factory from URL
 - ✅ POST `/api/factory/token/refresh` - Refresh factory OAuth tokens
 
-### 6. OAuth Authentication
+### 3. OAuth Authentication
 - ✅ GET `/api/oauth` - Get registered OAuth authenticators
 - ✅ GET `/api/oauth/token` - Get OAuth token for provider
 - ✅ DELETE `/api/oauth/token` - Invalidate OAuth token
@@ -81,13 +58,11 @@ This TypeScript project replaces the Java-based Eclipse Che Server:
 
 **📖 Configuration:** [docs/OAUTH_CONFIGURATION.md](docs/OAUTH_CONFIGURATION.md)
 
-### 7. SCM Integration
+### 4. SCM Integration
 - ✅ GET `/api/scm/resolve` - Resolve file content from SCM repository (supports public & private repos)
 
-### 8. Data Resolver & CORS Solution
-- ✅ POST `/api/data/resolver` - Backend proxy to fetch data from external URLs (solves CORS issues)
-- ✅ **Certificate Authority Support** - Handles self-signed certificates from Kubernetes mounts
-- ✅ **Smart Retry Logic** - Tries without certificates first, falls back to certificate validation
+### 5. System
+- ✅ GET `/api/system/state` - Health/state endpoint (Java-compatible)
 
 ### Technical Features
 

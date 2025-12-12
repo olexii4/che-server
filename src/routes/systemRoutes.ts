@@ -68,26 +68,9 @@ export async function registerSystemRoutes(fastify: FastifyInstance): Promise<vo
     async (request, reply) => {
       // For now, always return RUNNING status
       // In a full implementation, this would check actual system state
-      const protocol = request.headers['x-forwarded-proto'] || 'http';
-      const host = request.headers['x-forwarded-host'] || request.hostname;
-      const wsProtocol = protocol === 'https' ? 'wss' : 'ws';
-
       return reply.code(200).send({
         status: 'RUNNING',
-        links: [
-          {
-            href: `${wsProtocol}://${host}/websocket`,
-            rel: 'system.state.channel',
-            method: 'GET',
-            parameters: [
-              {
-                name: 'channel',
-                defaultValue: 'systemState',
-                required: true,
-              },
-            ],
-          },
-        ],
+        links: [],
       });
     },
   );

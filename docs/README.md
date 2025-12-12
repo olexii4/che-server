@@ -4,17 +4,15 @@ This directory contains detailed implementation guides for the TypeScript/Fastif
 
 ## Architecture Overview
 
-The che-server is a high-performance TypeScript reimplementation of the Eclipse Che Server REST APIs. It follows patterns from the [Eclipse Che Dashboard Backend](https://github.com/eclipse-che/che-dashboard/tree/main/packages/dashboard-backend).
+The che-server is a high-performance TypeScript reimplementation of a **subset** of the Eclipse Che Server REST APIs.
 
 ### Key Architectural Patterns
 
-| Component | Dashboard Backend | che-server | Purpose |
+| Component | che-server | Purpose |
 |-----------|-------------------|------------|---------|
-| `KubeConfigProvider` | ✅ | ✅ | Creates KubeConfig with user tokens |
-| `getToken()` | ✅ | `request.subject.token` | Extracts Bearer token from request |
-| `getServiceAccountToken()` | ✅ | ✅ | Gets ServiceAccount token for cluster ops |
-| `DevWorkspaceClient` | ✅ | Individual services | Aggregates API services |
-| `getUserName()` | ✅ | ✅ | Extracts username from JWT token |
+| `request.subject.token` | ✅ | Extracts Bearer token from request |
+| `getServiceAccountToken()` | ✅ | Gets ServiceAccount token for cluster-scoped operations |
+| `getUserName()` | ✅ | Extracts username from JWT token |
 
 ### Token Usage Model
 
@@ -25,9 +23,8 @@ The che-server is a high-performance TypeScript reimplementation of the Eclipse 
 │  1. User Request → Bearer Token (OIDC JWT)                          │
 │  2. middleware/auth.ts → Extract token, decode JWT, set subject     │
 │  3. Route Handler → Uses token based on operation type:             │
-│     a) User-scoped (DevWorkspace, Pods): User's token               │
-│     b) Cluster-scoped (Namespace create): ServiceAccount token      │
-│     c) RBAC operations (RoleBindings): ServiceAccount token         │
+│     a) Cluster-scoped (Namespace create): ServiceAccount token      │
+│     b) RBAC operations (RoleBindings, user-profile Secret): ServiceAccount token │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -40,29 +37,6 @@ The che-server is a high-performance TypeScript reimplementation of the Eclipse 
 | `./scripts/setup-rbac.sh` | Set up RBAC for che-server ServiceAccount |
 
 ## Documentation Files
-
-### [DASHBOARD_BACKEND_API_IMPLEMENTATION.md](DASHBOARD_BACKEND_API_IMPLEMENTATION.md)
-
-**Dashboard Backend API Implementation Guide - Phase 1** (~10KB, ~500 lines)
-
-Complete guide for Phase 1 APIs: server-config, cluster-config, and cluster-info.
-
-**Contents**:
-- Implemented APIs: `/api/server-config`, `/api/cluster-config`, `/api/cluster-info`
-- Environment variable configuration reference
-- Key differences from dashboard-backend (no local development features)
-- Type definitions and models
-- Testing and deployment guide
-- Future phases roadmap
-
-**Key Topics**:
-- Environment-based configuration (no CheCluster CR dependency)
-- Production-only features (excluded local OAuth, Dex, proxies)
-- Complete environment variables reference
-- Kubernetes deployment examples
-- API response examples and schemas
-
----
 
 ### [JAVA_TOKEN_ANALYSIS.md](JAVA_TOKEN_ANALYSIS.md)
 

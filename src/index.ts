@@ -10,7 +10,7 @@
  *   Red Hat, Inc. - initial API and implementation
  */
 
-import Fastify, { FastifyInstance } from 'fastify';
+import Fastify from 'fastify';
 import fastifyCors from '@fastify/cors';
 import dotenv from 'dotenv';
 import { authenticate, requireAuth } from './middleware/auth';
@@ -18,33 +18,10 @@ import { registerNamespaceRoutes } from './routes/namespaceRoutes';
 import { registerFactoryRoutes } from './routes/factoryRoutes';
 import { registerOAuthRoutes } from './routes/oauthRoutes';
 import { registerScmRoutes } from './routes/scmRoutes';
-import { registerClusterInfoRoutes } from './routes/clusterInfoRoutes';
-import { registerClusterConfigRoutes } from './routes/clusterConfigRoutes';
-import { registerServerConfigRoutes } from './routes/serverConfigRoutes';
-import { registerDevWorkspaceRoutes } from './routes/devworkspaceRoutes';
-import { registerDevWorkspaceTemplateRoutes } from './routes/devworkspaceTemplateRoutes';
-import { registerDevWorkspaceResourcesRoutes } from './routes/devworkspaceResourcesRoutes';
-import { registerDevWorkspaceClusterRoutes } from './routes/devworkspaceClusterRoutes';
-import { registerPodsRoutes } from './routes/podsRoutes';
-import { registerEventsRoutes } from './routes/eventsRoutes';
-import { registerEditorsRoutes } from './routes/editorsRoutes';
-import { registerUserProfileRoutes } from './routes/userProfileRoutes';
-import { registerSshKeysRoutes } from './routes/sshKeysRoutes';
-import { registerPersonalAccessTokenRoutes } from './routes/personalAccessTokenRoutes';
-import { registerGitConfigRoutes } from './routes/gitConfigRoutes';
-import { registerDockerConfigRoutes } from './routes/dockerConfigRoutes';
-import { registerWorkspacePreferencesRoutes } from './routes/workspacePreferencesRoutes';
-import { registerKubeConfigRoutes } from './routes/kubeConfigRoutes';
-import { registerGettingStartedSampleRoutes } from './routes/gettingStartedSampleRoutes';
-import { registerAirGapSampleRoutes } from './routes/airgapSampleRoutes';
 import { registerSystemRoutes } from './routes/systemRoutes';
-import { registerWebSocketRoutes } from './routes/websocketRoutes';
-import { registerDataResolverRoutes } from './routes/dataResolverRoutes';
 import { setupSwagger } from './config/swagger';
 import { logger } from './utils/logger';
 import { exec } from 'child_process';
-import websocketPlugin from '@fastify/websocket';
-import { CheClusterService } from './services/CheClusterService';
 
 // Load environment variables
 dotenv.config();
@@ -105,9 +82,6 @@ async function start() {
     fastify.decorate('authenticate', authenticate);
     fastify.decorate('requireAuth', requireAuth);
 
-    // Register WebSocket plugin
-    await fastify.register(websocketPlugin);
-
     // Setup Swagger/OpenAPI documentation
     await setupSwagger(fastify);
 
@@ -143,65 +117,11 @@ async function start() {
     // Register route modules with /api prefix (matches Java implementation)
     await fastify.register(
       async apiInstance => {
-        // Root API endpoint - returns API info (no auth required for CORS preflight, hidden from Swagger)
-        apiInstance.get(
-          '/',
-          {
-            schema: {
-              hide: true,
-              tags: ['api'],
-              summary: 'API root endpoint',
-              description: 'Returns API information and available endpoints',
-              response: {
-                200: {
-                  description: 'API information',
-                  type: 'object',
-                  properties: {
-                    name: { type: 'string' },
-                    version: { type: 'string' },
-                    implementation: { type: 'string' },
-                    docs: { type: 'string' },
-                  },
-                },
-              },
-            },
-          },
-          async (request, reply) => {
-            return reply.code(200).send({
-              name: 'Eclipse Che Server API',
-              version: '7.x',
-              implementation: 'Node.js/Fastify',
-              docs: '/api/docs',
-            });
-          },
-        );
-
         await registerNamespaceRoutes(apiInstance);
         await registerFactoryRoutes(apiInstance);
         await registerOAuthRoutes(apiInstance);
         await registerScmRoutes(apiInstance);
-        await registerDataResolverRoutes(apiInstance);
-        await registerClusterInfoRoutes(apiInstance);
-        await registerClusterConfigRoutes(apiInstance);
-        await registerServerConfigRoutes(apiInstance);
-        await registerDevWorkspaceRoutes(apiInstance);
-        await registerDevWorkspaceTemplateRoutes(apiInstance);
-        await registerDevWorkspaceResourcesRoutes(apiInstance);
-        await registerDevWorkspaceClusterRoutes(apiInstance);
-        await registerPodsRoutes(apiInstance);
-        await registerEventsRoutes(apiInstance);
-        await registerEditorsRoutes(apiInstance);
-        await registerUserProfileRoutes(apiInstance);
-        await registerSshKeysRoutes(apiInstance);
-        await registerPersonalAccessTokenRoutes(apiInstance);
-        await registerGitConfigRoutes(apiInstance);
-        await registerDockerConfigRoutes(apiInstance);
-        await registerWorkspacePreferencesRoutes(apiInstance);
-        await registerKubeConfigRoutes(apiInstance);
-        await registerGettingStartedSampleRoutes(apiInstance);
-        await registerAirGapSampleRoutes(apiInstance);
         await registerSystemRoutes(apiInstance);
-        await registerWebSocketRoutes(apiInstance);
       },
       { prefix: '/api' },
     );
@@ -243,46 +163,14 @@ async function start() {
 
     logger.info(`Che Server swagger is running on "http://localhost:${PORT}/swagger".`);
     logger.info(`\n🚀 Eclipse Che Next API Server (Fastify) is running on port ${PORT}`);
-
-    // Initialize CheClusterService AFTER server starts (async, non-blocking)
-    // This allows health checks to succeed while we load the CheCluster CR in the background
-    setTimeout(async () => {
-      try {
-        const cheClusterService = CheClusterService.getInstance();
-        await cheClusterService.initialize();
-        logger.info('CheClusterService initialized successfully');
-      } catch (error) {
-        logger.warn(
-          { error },
-          'Failed to initialize CheClusterService, will use fallback configuration from environment variables',
-        );
-      }
-    }, 100); // Small delay to ensure server is fully ready
     logger.info(`\n📚 API Documentation:`);
     logger.info(`   Swagger UI: http://localhost:${PORT}/swagger`);
     logger.info(`   OpenAPI JSON: http://localhost:${PORT}/swagger/json`);
     logger.info(`   OpenAPI YAML: http://localhost:${PORT}/swagger/yaml`);
     logger.info(`\n🔗 Endpoints:`);
-    logger.info(`\n   Cluster & Server Config:`);
-    logger.info(`   GET  http://localhost:${PORT}/api/cluster-info`);
-    logger.info(`   GET  http://localhost:${PORT}/api/cluster-config`);
-    logger.info(`   GET  http://localhost:${PORT}/api/server-config`);
     logger.info(`\n   Kubernetes Namespace:`);
     logger.info(`   POST http://localhost:${PORT}/api/kubernetes/namespace/provision`);
     logger.info(`   GET  http://localhost:${PORT}/api/kubernetes/namespace`);
-    logger.info(`\n   DevWorkspace Management:`);
-    logger.info(`   GET  http://localhost:${PORT}/api/namespace/:namespace/devworkspaces`);
-    logger.info(`   POST http://localhost:${PORT}/api/namespace/:namespace/devworkspaces`);
-    logger.info(`   GET  http://localhost:${PORT}/api/namespace/:namespace/devworkspacetemplates`);
-    logger.info(`   POST http://localhost:${PORT}/api/devworkspace-resources`);
-    logger.info(`\n   Monitoring & Info:`);
-    logger.info(`   GET  http://localhost:${PORT}/api/namespace/:namespace/pods`);
-    logger.info(`   GET  http://localhost:${PORT}/api/namespace/:namespace/events`);
-    logger.info(`   GET  http://localhost:${PORT}/api/editors`);
-    logger.info(`   GET  http://localhost:${PORT}/api/editors/devfile?che-editor=<id>`);
-    logger.info(`\n   User:`);
-    logger.info(`   GET  http://localhost:${PORT}/api/user/id`);
-    logger.info(`   GET  http://localhost:${PORT}/api/userprofile/:namespace`);
     logger.info(`\n   Factory Resolver:`);
     logger.info(`   POST http://localhost:${PORT}/api/factory/resolver`);
     logger.info(`   POST http://localhost:${PORT}/api/factory/token/refresh`);
@@ -292,9 +180,10 @@ async function start() {
     logger.info(`   DELETE http://localhost:${PORT}/api/oauth/token`);
     logger.info(`   GET  http://localhost:${PORT}/api/oauth/authenticate`);
     logger.info(`   GET  http://localhost:${PORT}/api/oauth/callback`);
-    logger.info(`\n   SCM & Data:`);
+    logger.info(`\n   SCM:`);
     logger.info(`   GET  http://localhost:${PORT}/api/scm/resolve`);
-    logger.info(`   POST http://localhost:${PORT}/api/data/resolver`);
+    logger.info(`\n   System:`);
+    logger.info(`   GET  http://localhost:${PORT}/api/system/state`);
     logger.info(`\n   Health:`);
     logger.info(`   GET  http://localhost:${PORT}/health\n`);
   } catch (err) {

@@ -19,10 +19,9 @@
  * 3. Basic auth: Authorization: Basic <base64(username:userid)>
  * 4. gap-auth header (from Eclipse Che Gateway)
  */
-import { FastifyRequest, FastifyReply, HookHandlerDoneFunction } from 'fastify';
+import { FastifyRequest, FastifyReply } from 'fastify';
 import * as k8s from '@kubernetes/client-node';
 import { logger } from '../utils/logger';
-import { getServiceAccountToken } from '../helpers/getServiceAccountToken';
 
 /**
  * User subject information extracted from authentication

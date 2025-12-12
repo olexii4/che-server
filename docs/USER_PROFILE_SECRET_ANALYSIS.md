@@ -330,21 +330,10 @@ await namespaceFactory.getOrCreate(namespaceName);           // Creates namespac
 await userProfileService.getUserProfile(namespaceName);      // Creates user-profile Secret
 ```
 
-### User Profile Access (GET /api/user/id)
+### User Profile Access (internal helper)
 
-```typescript
-// 1️⃣ User token: Authentication
-const userToken = request.headers.authorization;
-const username = request.subject.userName;
-
-// 2️⃣ Service account token: Read Secret
-const serviceAccountToken = getServiceAccountToken();
-const kubeConfig = getKubeConfig(serviceAccountToken);
-const service = new UserProfileService(kubeConfig);
-
-// 3️⃣ Read user-profile Secret using service account
-const userProfile = await service.getUserProfile(namespace);
-```
+The TypeScript implementation stores user identity data in the `user-profile` Secret inside the user namespace.
+This Secret is created/ensured during namespace provisioning and may also be accessed by internal services when needed.
 
 ---
 
