@@ -187,8 +187,8 @@ docker run -p 8080:8080 docker.io/olexii4dockerid/che-server:next
 The `cr-patch.yaml` file patches the CheCluster Custom Resource to use this TypeScript che-server:
 
 ```bash
-# Deploy new Eclipse Che instance
-chectl server:deploy --platform=minikube --che-operator-cr-patch-yaml=$(PWD)/cr-patch.yaml
+# Deploy new Eclipse Che instance (OpenShift example)
+chectl server:deploy --platform=openshift --batch --che-operator-cr-patch-yaml=$(PWD)/cr-patch.yaml
 
 # Update existing instance
 chectl server:update --che-operator-cr-patch-yaml=$(PWD)/cr-patch.yaml
@@ -199,6 +199,14 @@ chectl server:update --che-operator-cr-patch-yaml=$(PWD)/cr-patch.yaml
 ```bash
 kubectl patch -n eclipse-che "checluster/eclipse-che" --type=json \
   -p='[{"op": "replace", "path": "/spec/components/cheServer/deployment", "value": {containers: [{image: "docker.io/olexii4dockerid/che-server:next", imagePullPolicy: "Always", name: "che-server"}]}}]'
+```
+
+### OpenShift helper script
+
+If you want a single command for OpenShift deployment + patching, use:
+
+```bash
+./run/deploy-openshift.sh --patch-only
 ```
 
 ### Verify Deployment
@@ -222,7 +230,7 @@ kubectl get deployment che -n eclipse-che -o jsonpath='{.spec.template.spec.cont
 | `NAMESPACE_TEMPLATE`           | Template for namespace names             | `che-<username>` |
 | `CHE_SELF_SIGNED_MOUNT_PATH`   | Path to custom CA certificates           | `/public-certs`  |
 | `LOCAL_RUN`                    | Use local kubeconfig instead of in-cluster | `false`       |
-| `CHE_INFRA_KUBERNETES_USER_CLUSTER_ROLES` | ClusterRoles to bind to users (comma-separated). Set to `NULL` to disable | `che-user-namespace-access` |
+| `CHE_INFRA_KUBERNETES_USER_CLUSTER_ROLES` | ClusterRoles to bind to users (comma-separated). If unset/empty, user RoleBindings are not created (matches Java behavior) | *(unset)* |
 
 ### Namespace Template Placeholders
 

@@ -1,7 +1,7 @@
 # Kubernetes CheCluster patch for Eclipse Che Server (TypeScript)
 #
 # Usage with chectl:
-#   chectl server:deploy --platform=minikube --che-operator-cr-patch-yaml=$(PWD)/cr-patch.yaml
+#   chectl server:deploy --platform=openshift --batch --che-operator-cr-patch-yaml=$(PWD)/cr-patch.yaml
 #   chectl server:update --che-operator-cr-patch-yaml=$(PWD)/cr-patch.yaml
 #
 # Usage with kubectl (recommended for custom images):

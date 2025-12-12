@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
 #
 # Simple redeploy helper for Eclipse Che on an existing cluster.
-# - Reuses the current kube context (does not delete minikube by default)
 # - Patches CheCluster to use a custom che-server image
-# - Applies che-server RBAC (scripts/setup-rbac.sh)
 # - Restarts the che pod so it re-reads CheCluster CR/config if needed
 #
 # Usage:
 #   ./scripts/redeploy-che.sh
 #   ./scripts/redeploy-che.sh --image docker.io/olexii4dockerid/che-server:next
-#   ./scripts/redeploy-che.sh --deploy-che
-#   ./scripts/redeploy-che.sh --fresh-minikube
+#   ./scripts/redeploy-che.sh --deploy-che --platform openshift
 #
 set -euo pipefail
 
@@ -22,10 +19,7 @@ CHECLUSTER_NAME="${CHECLUSTER_NAME:-eclipse-che}"
 CHE_SERVER_IMAGE="${CHE_SERVER_IMAGE:-docker.io/olexii4dockerid/che-server:next}"
 
 DEPLOY_CHE=false
-FRESH_MINIKUBE=false
-MINIKUBE_CPUS="${MINIKUBE_CPUS:-8}"
-MINIKUBE_MEMORY="${MINIKUBE_MEMORY:-15000}"
-MINIKUBE_DISK="${MINIKUBE_DISK:-50g}"
+CHECTL_PLATFORM="${CHECTL_PLATFORM:-openshift}"
 
 usage() {
   cat <<EOF
@@ -35,13 +29,13 @@ Options:
   --image IMAGE          che-server image to use (default: ${CHE_SERVER_IMAGE})
   --namespace NS         Che namespace (default: ${CHE_NAMESPACE})
   --checluster NAME      CheCluster name (default: ${CHECLUSTER_NAME})
-  --deploy-che           Run 'chectl server:deploy --platform=minikube --batch' first
-  --fresh-minikube       (Destructive) Recreate minikube then (optionally) deploy Che
+  --deploy-che           Run 'chectl server:deploy' first
+  --platform PLATFORM    chectl platform (default: ${CHECTL_PLATFORM}) e.g. openshift, kubernetes
   -h, --help             Show help
 
 Environment:
   CHE_SERVER_IMAGE, CHE_NAMESPACE, CHECLUSTER_NAME
-  MINIKUBE_CPUS, MINIKUBE_MEMORY, MINIKUBE_DISK
+  CHECTL_PLATFORM
 EOF
 }
 
@@ -51,7 +45,7 @@ while [[ $# -gt 0 ]]; do
     --namespace) CHE_NAMESPACE="$2"; shift 2 ;;
     --checluster) CHECLUSTER_NAME="$2"; shift 2 ;;
     --deploy-che) DEPLOY_CHE=true; shift ;;
-    --fresh-minikube) FRESH_MINIKUBE=true; shift ;;
+    --platform) CHECTL_PLATFORM="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage; exit 1 ;;
   esac
@@ -74,26 +68,12 @@ echo "Che namespace: ${CHE_NAMESPACE}"
 echo "CheCluster: ${CHECLUSTER_NAME}"
 echo "che-server image: ${CHE_SERVER_IMAGE}"
 
-if [[ "${FRESH_MINIKUBE}" == "true" ]]; then
-  need_cmd minikube
-  echo ""
-  echo "[fresh-minikube] Deleting minikube..."
-  minikube delete --all --purge || true
-  echo "[fresh-minikube] Starting minikube..."
-  minikube start --driver=docker --cpus="${MINIKUBE_CPUS}" --memory="${MINIKUBE_MEMORY}" --disk-size="${MINIKUBE_DISK}"
-  minikube addons enable ingress
-fi
-
 if [[ "${DEPLOY_CHE}" == "true" ]]; then
   need_cmd chectl
   echo ""
   echo "Deploying Che with chectl..."
-  chectl server:deploy --platform=minikube --batch
+  chectl server:deploy --platform="${CHECTL_PLATFORM}" --batch
 fi
-
-echo ""
-echo "Applying che-server RBAC..."
-CHE_NAMESPACE="${CHE_NAMESPACE}" "${REPO_ROOT}/scripts/setup-rbac.sh"
 
 echo ""
 echo "Patching CheCluster to use custom che-server image..."
