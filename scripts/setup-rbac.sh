@@ -47,6 +47,10 @@ rules:
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Allow managing configmaps in user namespaces (for workspace preferences)
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 # Allow managing namespaces
 - apiGroups: [""]
   resources: ["namespaces"]

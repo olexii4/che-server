@@ -18,6 +18,7 @@ import { logger } from '../utils/logger';
 import { KubernetesNamespaceFactory } from './KubernetesNamespaceFactory';
 import { UserProfileService } from './UserProfileService';
 import { UserPermissionConfigurator } from './UserPermissionConfigurator';
+import { WorkspacePreferencesService } from './WorkspacePreferencesService';
 
 /**
  * Provisions the k8s Namespace. After provisioning, configures the namespace.
@@ -117,6 +118,12 @@ export class NamespaceProvisioner {
       // Matches Java: UserPermissionConfigurator.configure()
       // This allows the user to access their namespace resources via RBAC
       await this.userPermissionConfigurator.configure(namespaceName, username);
+
+      // 3. WorkspacePreferences ConfigMap - Ensure it exists
+      // Java creates/ensures preferences storage during namespace setup.
+      // The dashboard backend expects this ConfigMap to exist in the user namespace.
+      const workspacePreferencesService = new WorkspacePreferencesService(this.kubeConfig);
+      await workspacePreferencesService.ensureConfigMapExists(namespaceName);
       
       logger.info({ namespaceName }, '✅ Namespace configured successfully');
     } catch (error: any) {
