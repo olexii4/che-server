@@ -11,14 +11,14 @@
 # ============================================
 # Builder stage
 # ============================================
-FROM registry.redhat.io/ubi9/nodejs-20-minimal:9.6-1755755732 AS builder
+FROM docker.io/node:20.19-slim AS builder
 
 USER 0
 
 # Install build dependencies
-RUN microdnf update -y && \
-    microdnf install -y jq && \
-    microdnf clean all
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends jq && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /che-server
 
@@ -26,8 +26,8 @@ WORKDIR /che-server
 COPY .yarn/releases /che-server/.yarn/releases/
 COPY .yarnrc.yml /che-server/.yarnrc.yml
 
-# Link yarn to /usr/bin/yarn
-RUN ln -s /che-server/.yarn/releases/yarn-*.cjs /usr/bin/yarn
+# Link yarn to PATH (force replace base-image yarn so we use the repo-pinned Yarn v4)
+RUN ln -sf /che-server/.yarn/releases/yarn-*.cjs /usr/local/bin/yarn
 
 # Copy package files for dependency installation
 COPY package.json /che-server/
@@ -49,14 +49,14 @@ RUN yarn build
 # ============================================
 # Production image
 # ============================================
-FROM registry.redhat.io/ubi9/nodejs-20-minimal:9.6-1755755732
+FROM docker.io/node:20.19-slim
 
 USER 0
 
 # Install runtime dependencies
-RUN microdnf update -y && \
-    microdnf install -y shadow-utils && \
-    microdnf clean all
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends passwd && \
+    rm -rf /var/lib/apt/lists/*
 
 ENV CHE_HOME=/home/user/che-server
 
