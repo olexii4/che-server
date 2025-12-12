@@ -15,6 +15,7 @@ import { OAuthService } from '../services/OAuthService';
 import { PersonalAccessTokenService } from '../services/PersonalAccessTokenService';
 import { getServiceAccountKubeConfig } from '../helpers/getKubernetesClient';
 import { GitProvider } from '../models/CredentialsModels';
+import { PatLookupService } from '../services/PatLookupService';
 
 /**
  * Register OAuth routes
@@ -203,16 +204,30 @@ export async function registerOAuthRoutes(fastify: FastifyInstance): Promise<voi
           });
         }
 
-        // Get token
-        let token = await oauthService.getOrRefreshToken(request.subject.userId, oauthProvider);
+        // NOTE: In Java, /oauth/token returns an OAuth token if present, otherwise it throws Unauthorized.
+        // In Che Next (Kubernetes), OAuth tokens are typically stored as "oauth2-*" Personal Access Token secrets
+        // in the user's namespace (e.g., admin-che).
+        const namespace = `${request.subject.userName}-che`;
 
-        // If no token exists, generate a mock one (for development/demo)
-        if (!token) {
-          token = oauthService.generateMockToken(oauthProvider);
-          oauthService.storeToken(request.subject.userId, oauthProvider, token);
+        // First: check in-memory token cache (dev/testing only)
+        const memToken = await oauthService.getOrRefreshToken(request.subject.userId, oauthProvider);
+        if (memToken) {
+          return reply.code(200).send(memToken);
         }
 
-        return reply.code(200).send(token);
+        // Second: look for an oauth2-* PAT secret created by the OAuth callback
+        const kubeConfig = getServiceAccountKubeConfig();
+        const patLookup = new PatLookupService(kubeConfig);
+        const pat = await patLookup.getPatForProvider(namespace, oauthProvider);
+
+        if (pat?.tokenData && pat.isOauth) {
+          return reply.code(200).send({ token: pat.tokenData, scope: '' });
+        }
+
+        return reply.code(401).send({
+          error: 'Unauthorized',
+          message: `OAuth token for user ${request.subject.userId} was not found`,
+        });
       } catch (error: any) {
         fastify.log.error('Error getting OAuth token:', error);
 
@@ -318,19 +333,43 @@ export async function registerOAuthRoutes(fastify: FastifyInstance): Promise<voi
           });
         }
 
-        // Invalidate token
-        await oauthService.invalidateToken(request.subject.userId, oauthProvider);
+        const namespace = `${request.subject.userName}-che`;
 
+        // Invalidate in-memory token (if any)
+        try {
+          oauthService.invalidateToken(request.subject.userId, oauthProvider);
+        } catch {
+          // Ignore - we treat revoke as idempotent
+        }
+
+        // Also delete oauth2-* PAT tokens in the user's namespace (where callback stores tokens)
+        try {
+          const kubeConfig = getServiceAccountKubeConfig();
+          const patLookup = new PatLookupService(kubeConfig);
+          const pats = await patLookup.getAllPats(namespace);
+
+          const kubeConfigSa = getServiceAccountKubeConfig();
+          const patService = new PersonalAccessTokenService(kubeConfigSa);
+
+          const oauthPats = pats.filter(
+            p =>
+              p.isOauth &&
+              p.gitProvider?.toLowerCase() === oauthProvider.toLowerCase() &&
+              p.cheUserId === request.subject!.userId,
+          );
+
+          for (const p of oauthPats) {
+            await patService.delete(namespace, p.tokenName);
+          }
+        } catch (err) {
+          // Treat as best-effort; revocation should not fail the UI flow.
+          fastify.log.warn({ err, namespace, oauthProvider }, 'Failed to delete oauth PAT secret(s)');
+        }
+
+        // Idempotent revoke: always return 204
         return reply.code(204).send();
       } catch (error: any) {
         fastify.log.error('Error invalidating OAuth token:', error);
-
-        if (error.message?.includes('not found')) {
-          return reply.code(404).send({
-            error: 'Not Found',
-            message: error.message,
-          });
-        }
 
         return reply.code(500).send({
           error: 'Internal Server Error',
@@ -458,7 +497,9 @@ export async function registerOAuthRoutes(fastify: FastifyInstance): Promise<voi
         const namespace = `${userName}-che`;
 
         const stateData = {
-          redirect_after_login: redirect_after_login || '/',
+          // Default to the dashboard route if the UI didn't provide a redirect.
+          // This avoids redirecting to "/" after OAuth login (common "wrong redirect" symptom).
+          redirect_after_login: redirect_after_login || '/dashboard/',
           oauth_provider: oauth_provider,
           userId,
           userName,
@@ -561,6 +602,10 @@ export async function registerOAuthRoutes(fastify: FastifyInstance): Promise<voi
           },
         },
       },
+      // In Che, the callback is served under the same domain as the dashboard and is typically
+      // authenticated by the gateway (gap-auth / session). We authenticate here to get user context
+      // for storing the token in the correct namespace.
+      onRequest: [fastify.authenticate],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
@@ -625,6 +670,13 @@ export async function registerOAuthRoutes(fastify: FastifyInstance): Promise<voi
               fastify.log.warn({ err }, 'Failed to decode state parameter');
             }
           }
+        }
+
+        // Prefer authenticated user context if available (gateway-authenticated callback)
+        if (request.subject?.userName) {
+          userName = request.subject.userName;
+          userId = request.subject.userId;
+          namespace = `${userName}-che`;
         }
 
         // Exchange authorization code for access token
