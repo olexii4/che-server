@@ -3,7 +3,7 @@
 # Test script for Eclipse Che Next API Server
 # This script demonstrates how to use the API endpoints
 
-API_URL="http://localhost:8080"
+API_URL="http://localhost:8080/api"
 USERNAME="johndoe"
 USERID="user123"
 
@@ -17,14 +17,8 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Test 1: Health Check
-echo -e "${BLUE}Test 1: Health Check${NC}"
-echo "GET $API_URL/health"
-curl -s -w "\n" $API_URL/health
-echo ""
-
-# Test 2: Provision Namespace (Bearer token)
-echo -e "${BLUE}Test 2: Provision Namespace (Bearer Token)${NC}"
+# Test 1: Provision Namespace (Bearer token)
+echo -e "${BLUE}Test 1: Provision Namespace (Bearer Token)${NC}"
 echo "POST $API_URL/kubernetes/namespace/provision"
 echo "Authorization: Bearer $USERID:$USERNAME"
 RESPONSE=$(curl -s -X POST $API_URL/kubernetes/namespace/provision \
@@ -33,8 +27,8 @@ RESPONSE=$(curl -s -X POST $API_URL/kubernetes/namespace/provision \
 echo $RESPONSE | jq . 2>/dev/null || echo $RESPONSE
 echo ""
 
-# Test 3: Provision Namespace (Basic Auth)
-echo -e "${BLUE}Test 3: Provision Namespace (Basic Auth)${NC}"
+# Test 2: Provision Namespace (Basic Auth)
+echo -e "${BLUE}Test 2: Provision Namespace (Basic Auth)${NC}"
 echo "POST $API_URL/kubernetes/namespace/provision"
 echo "Authorization: Basic (username:$USERNAME, password:$USERID)"
 RESPONSE=$(curl -s -X POST $API_URL/kubernetes/namespace/provision \
@@ -43,8 +37,8 @@ RESPONSE=$(curl -s -X POST $API_URL/kubernetes/namespace/provision \
 echo $RESPONSE | jq . 2>/dev/null || echo $RESPONSE
 echo ""
 
-# Test 4: List Namespaces
-echo -e "${BLUE}Test 4: List Namespaces${NC}"
+# Test 3: List Namespaces
+echo -e "${BLUE}Test 3: List Namespaces${NC}"
 echo "GET $API_URL/kubernetes/namespace"
 echo "Authorization: Bearer $USERID:$USERNAME"
 RESPONSE=$(curl -s $API_URL/kubernetes/namespace \
@@ -52,16 +46,16 @@ RESPONSE=$(curl -s $API_URL/kubernetes/namespace \
 echo $RESPONSE | jq . 2>/dev/null || echo $RESPONSE
 echo ""
 
-# Test 5: Unauthorized Request
-echo -e "${BLUE}Test 5: Unauthorized Request (No Auth Header)${NC}"
+# Test 4: Unauthorized Request
+echo -e "${BLUE}Test 4: Unauthorized Request (No Auth Header)${NC}"
 echo "POST $API_URL/kubernetes/namespace/provision"
 RESPONSE=$(curl -s -X POST $API_URL/kubernetes/namespace/provision \
   -H "Content-Type: application/json")
 echo $RESPONSE | jq . 2>/dev/null || echo $RESPONSE
 echo ""
 
-# Test 6: Different Users
-echo -e "${BLUE}Test 6: Provision for Different User${NC}"
+# Test 5: Different Users
+echo -e "${BLUE}Test 5: Provision for Different User${NC}"
 echo "POST $API_URL/kubernetes/namespace/provision"
 echo "Authorization: Bearer user456:janedoe"
 RESPONSE=$(curl -s -X POST $API_URL/kubernetes/namespace/provision \
@@ -70,8 +64,8 @@ RESPONSE=$(curl -s -X POST $API_URL/kubernetes/namespace/provision \
 echo $RESPONSE | jq . 2>/dev/null || echo $RESPONSE
 echo ""
 
-# Test 7: Resolve Factory
-echo -e "${BLUE}Test 7: Resolve Factory from URL${NC}"
+# Test 6: Resolve Factory
+echo -e "${BLUE}Test 6: Resolve Factory from URL${NC}"
 echo "POST $API_URL/factory/resolver"
 echo "Authorization: Bearer $USERID:$USERNAME"
 RESPONSE=$(curl -s -X POST $API_URL/factory/resolver \
@@ -81,8 +75,8 @@ RESPONSE=$(curl -s -X POST $API_URL/factory/resolver \
 echo $RESPONSE | jq . 2>/dev/null || echo $RESPONSE
 echo ""
 
-# Test 8: Resolve Factory with Validation
-echo -e "${BLUE}Test 8: Resolve Factory with Validation${NC}"
+# Test 7: Resolve Factory with Validation
+echo -e "${BLUE}Test 7: Resolve Factory with Validation${NC}"
 echo "POST $API_URL/factory/resolver?validate=true"
 RESPONSE=$(curl -s -X POST "$API_URL/factory/resolver?validate=true" \
   -H "Authorization: Bearer $USERID:$USERNAME" \
@@ -91,12 +85,19 @@ RESPONSE=$(curl -s -X POST "$API_URL/factory/resolver?validate=true" \
 echo $RESPONSE | jq . 2>/dev/null || echo $RESPONSE
 echo ""
 
-# Test 9: Refresh Factory Token
-echo -e "${BLUE}Test 9: Refresh Factory Token${NC}"
+# Test 8: Refresh Factory Token
+echo -e "${BLUE}Test 8: Refresh Factory Token${NC}"
 echo "POST $API_URL/factory/token/refresh?url=https://github.com/user/repo"
 RESPONSE=$(curl -s -X POST "$API_URL/factory/token/refresh?url=https://github.com/user/repo" \
   -H "Authorization: Bearer $USERID:$USERNAME" \
   -H "Content-Type: application/json")
+echo $RESPONSE | jq . 2>/dev/null || echo $RESPONSE
+echo ""
+
+# Test 9: System State
+echo -e "${BLUE}Test 9: System State${NC}"
+echo "GET $API_URL/system/state"
+RESPONSE=$(curl -s $API_URL/system/state)
 echo $RESPONSE | jq . 2>/dev/null || echo $RESPONSE
 echo ""
 

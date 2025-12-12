@@ -1,12 +1,9 @@
 ### Test script for REST Client (VS Code) or IntelliJ HTTP Client
 ### Install "REST Client" extension in VS Code to use this file
 
-@baseUrl = http://localhost:8080
+@baseUrl = http://localhost:8080/api
 @username = johndoe
 @userid = user123
-
-### Health Check
-GET {{baseUrl}}/health
 
 ### Provision Namespace (Bearer Token)
 POST {{baseUrl}}/kubernetes/namespace/provision
@@ -53,6 +50,9 @@ Content-Type: application/json
 POST {{baseUrl}}/factory/token/refresh?url=https://github.com/user/repo
 Authorization: Bearer {{userid}}:{{username}}
 Content-Type: application/json
+
+### System State
+GET {{baseUrl}}/system/state
 
 ### Resolve Factory without Parameters (should fail)
 POST {{baseUrl}}/factory/resolver
