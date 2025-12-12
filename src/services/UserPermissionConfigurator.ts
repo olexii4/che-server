@@ -20,18 +20,15 @@ import { logger } from '../utils/logger';
 export interface UserPermissionConfig {
   /**
    * Comma-separated list of ClusterRoles to bind to the user in their namespace.
-   * Default: 'che-user-namespace-access'
+   * Default: disabled (must be explicitly configured by Che)
    */
   userClusterRoles: string[];
 }
 
-/**
- * Default ClusterRole that grants user access to their namespace resources.
- * This role should be created by the Che operator and includes permissions for:
- * - secrets, configmaps, pods, events (get, list, watch, create, update, patch)
- * - devworkspaces, devworkspacetemplates (get, list, watch, create, update, patch, delete)
- */
-const DEFAULT_USER_CLUSTER_ROLES = ['che-user-namespace-access'];
+// Important for "drop-in replacement" mode:
+// Do NOT assume any ClusterRole exists. Che/Operator must explicitly configure roles
+// via CHE_INFRA_KUBERNETES_USER_CLUSTER_ROLES (Java property: che.infra.kubernetes.user_cluster_roles).
+const DEFAULT_USER_CLUSTER_ROLES: string[] = [];
 
 /**
  * Configures user permissions in their namespace by creating RoleBindings.
@@ -94,7 +91,7 @@ export class UserPermissionConfigurator {
       return envRoles.split(',').map(role => role.trim()).filter(role => role.length > 0);
     }
 
-    // Default: enable user namespace access role
+    // Default: disabled unless explicitly configured by Che
     return DEFAULT_USER_CLUSTER_ROLES;
   }
 

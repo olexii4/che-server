@@ -55,7 +55,7 @@ describe('Authentication Middleware', () => {
 
       await authenticate(mockRequest as FastifyRequest, mockReply as FastifyReply);
 
-      // TokenReview API will fail for test token and fall back to 'che-user'
+      // Non-JWT bearer token falls back to 'che-user' (TokenReview disabled)
       expect(mockRequest.subject).toEqual({
         id: 'che-user',
         userId: 'che-user',
@@ -86,7 +86,7 @@ describe('Authentication Middleware', () => {
       };
 
       // This is now valid - single token without colons is treated as real Kubernetes token
-      // TokenReview API will fail and fall back to 'che-user'
+      // Non-JWT bearer token falls back to 'che-user' (TokenReview disabled)
       await authenticate(mockRequest as FastifyRequest, mockReply as FastifyReply);
 
       expect(mockRequest.subject).toEqual({

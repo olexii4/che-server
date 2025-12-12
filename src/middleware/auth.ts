@@ -20,7 +20,6 @@
  * 4. gap-auth header (from Eclipse Che Gateway)
  */
 import { FastifyRequest, FastifyReply } from 'fastify';
-import * as k8s from '@kubernetes/client-node';
 import { logger } from '../utils/logger';
 
 /**
@@ -70,81 +69,20 @@ function decodeJwtPayload(token: string): any {
   }
 }
 
-/**
- * Extract username from Kubernetes token using TokenReview API
- * Returns null if TokenReview is not available or fails
- */
-async function getUsernameFromK8sToken(token: string): Promise<string | null> {
-  let timeoutId: NodeJS.Timeout | undefined;
+function sanitizeUsername(raw: string): string {
+  let username = raw.trim();
+  if (!username) return username;
 
-  try {
-    // Add timeout to prevent hanging
-    const timeoutPromise = new Promise<null>(resolve => {
-      timeoutId = setTimeout(() => {
-        logger.warn('TokenReview API call timed out after 3 seconds');
-        resolve(null);
-      }, 3000);
-    });
+  // "user@domain" -> "user"
+  username = username.split('@')[0];
 
-    const tokenReviewPromise = (async () => {
-      const kc = new k8s.KubeConfig();
-      kc.loadFromDefault();
-
-      const authApi = kc.makeApiClient(k8s.AuthenticationV1Api);
-
-      // Create TokenReview request
-      const tokenReview: k8s.V1TokenReview = {
-        apiVersion: 'authentication.k8s.io/v1',
-        kind: 'TokenReview',
-        spec: {
-          token: token,
-        },
-      };
-
-      const response = await authApi.createTokenReview(tokenReview);
-
-      // Check if token is authenticated
-      if (response.body.status?.authenticated) {
-        const username = response.body.status.user?.username;
-        if (username) {
-          logger.info(`✅ Extracted username from K8s token: ${username}`);
-
-          // Clean up username for namespace usage
-          // Remove system: prefix and kube: prefix if present
-          let cleanUsername = username;
-          if (cleanUsername.startsWith('system:serviceaccount:')) {
-            // Extract service account name: system:serviceaccount:namespace:name -> name
-            const parts = cleanUsername.split(':');
-            cleanUsername = parts[parts.length - 1];
-          } else if (cleanUsername.startsWith('kube:')) {
-            cleanUsername = cleanUsername.replace(/^kube:/, '');
-          } else if (cleanUsername.includes(':')) {
-            // For other system accounts, take the last part
-            const parts = cleanUsername.split(':');
-            cleanUsername = parts[parts.length - 1];
-          }
-
-          return cleanUsername;
-        }
-      }
-
-      logger.warn('Token is not authenticated or has no username');
-      return null;
-    })();
-
-    // Race between TokenReview and timeout
-    const result = await Promise.race([tokenReviewPromise, timeoutPromise]);
-
-    return result;
-  } catch (error: any) {
-    logger.error({ error: error.message }, 'Failed to validate token with TokenReview API');
-    return null;
-  } finally {
-    // Always clear the timeout to prevent Jest from hanging
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
+  // OpenShift/Kubernetes sometimes prefixes identities
+  // e.g. "kube:admin" or "system:admin" -> "admin"
+  if (username.includes(':')) {
+    username = username.split(':')[username.split(':').length - 1];
   }
+
+  return username;
 }
 
 /**
@@ -204,23 +142,12 @@ async function parseBearerToken(token: string): Promise<Subject | null> {
   }
 
   // Real Kubernetes/OpenShift token (no colons, not a JWT)
-  // Use TokenReview API to get the username
-  logger.info(`🔍 Kubernetes token detected (not JWT), querying TokenReview API for username`);
-
-  const username = await getUsernameFromK8sToken(token);
-
-  if (username) {
-    logger.info(`✅ Kubernetes token authenticated as: ${username}`);
-    return {
-      id: username,
-      userId: username,
-      userName: username,
-      token: token,
-    };
-  }
-
-  // Fallback if TokenReview fails or is not available
-  logger.warn(`⚠️ TokenReview unavailable or failed, using 'che-user' as fallback`);
+  // IMPORTANT: For "drop-in replacement" mode we avoid TokenReview API calls because they require
+  // cluster-scoped RBAC (tokenreviews.authentication.k8s.io). On OpenShift default Che install
+  // may not grant this to che-server.
+  logger.warn(
+    `⚠️ Non-JWT bearer token provided; TokenReview is disabled. Falling back to 'che-user'.`,
+  );
   return {
     id: 'che-user',
     userId: 'che-user',
@@ -251,14 +178,20 @@ function parseBasicAuth(credentials: string): Subject | null {
 /**
  * Fastify hook to authenticate requests
  */
-export async function authenticate(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+export async function authenticate(request: FastifyRequest): Promise<void> {
   // Check for Eclipse Che Gateway authentication first
   const gapAuth = request.headers['gap-auth'];
+  const forwardedUser =
+    (request.headers['x-forwarded-user'] as string | undefined) ||
+    (request.headers['x-forwarded-preferred-username'] as string | undefined) ||
+    (request.headers['x-forwarded-email'] as string | undefined);
 
   // DEBUG: Log all authentication headers
   logger.info('🔐 Authentication attempt:', {
     path: request.url,
     hasGapAuth: !!gapAuth,
+    hasForwardedUser: !!forwardedUser,
+    forwardedUserValue: forwardedUser || 'not-present',
     gapAuthValue: gapAuth || 'not-present',
     hasAuthorization: !!request.headers.authorization,
     authType: request.headers.authorization?.split(' ')[0] || 'none',
@@ -269,7 +202,7 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
     // Format: username (e.g., "che@eclipse.org" or "admin")
     // Extract just the username part before @ if present
     const fullUsername = gapAuth as string;
-    const username = fullUsername.split('@')[0];
+    const username = sanitizeUsername(fullUsername);
 
     logger.info(`✅ Using gap-auth: "${fullUsername}" -> username: "${username}"`);
 
@@ -284,6 +217,21 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
       isGatewayAuth: true,
     };
     return;
+  }
+
+  if (forwardedUser) {
+    const username = sanitizeUsername(forwardedUser);
+    if (username) {
+      logger.info(`✅ Using forwarded user header -> username: "${username}"`);
+      request.subject = {
+        id: username,
+        userId: username,
+        userName: username,
+        token: '',
+        isGatewayAuth: true,
+      };
+      return;
+    }
   }
 
   // Fallback to standard Authorization header (for standalone mode)
