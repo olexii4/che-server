@@ -126,19 +126,6 @@ async function start() {
       { prefix: '/api' },
     );
 
-    // Health check endpoints for Kubernetes (hidden from Swagger)
-    fastify.get('/healthz', { schema: { hide: true } }, async (request, reply) => {
-      return reply.code(200).send({ status: 'ok' });
-    });
-
-    fastify.get('/readyz', { schema: { hide: true } }, async (request, reply) => {
-      return reply.code(200).send({ status: 'ready' });
-    });
-
-    fastify.get('/livez', { schema: { hide: true } }, async (request, reply) => {
-      return reply.code(200).send({ status: 'alive' });
-    });
-
     // Global error handler
     fastify.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => {
       fastify.log.error(error);
