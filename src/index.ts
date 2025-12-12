@@ -19,6 +19,7 @@ import { registerFactoryRoutes } from './routes/factoryRoutes';
 import { registerOAuthRoutes } from './routes/oauthRoutes';
 import { registerScmRoutes } from './routes/scmRoutes';
 import { registerSystemRoutes } from './routes/systemRoutes';
+import { registerUserRoutes } from './routes/userRoutes';
 import { setupSwagger } from './config/swagger';
 import { logger } from './utils/logger';
 import { exec } from 'child_process';
@@ -122,6 +123,7 @@ async function start() {
         await registerOAuthRoutes(apiInstance);
         await registerScmRoutes(apiInstance);
         await registerSystemRoutes(apiInstance);
+        await registerUserRoutes(apiInstance);
       },
       { prefix: '/api' },
     );
