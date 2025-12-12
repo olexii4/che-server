@@ -178,7 +178,8 @@ function parseBasicAuth(credentials: string): Subject | null {
 /**
  * Fastify hook to authenticate requests
  */
-export async function authenticate(request: FastifyRequest): Promise<void> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function authenticate(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
   // Check for Eclipse Che Gateway authentication first
   const gapAuth = request.headers['gap-auth'];
   const forwardedUser =
