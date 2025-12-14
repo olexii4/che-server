@@ -28,27 +28,31 @@ CHE_SERVER_IMAGE="${CHE_SERVER_IMAGE:-docker.io/olexii4dockerid/che-server:next}
 
 need_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "Missing required command: $1" >&2; exit 1; }; }
 need_cmd kubectl
+need_cmd jq
 
 echo "[INFO] Patching CheCluster/${CHECLUSTER_NAME} in namespace ${CHE_NAMESPACE}"
 echo "[INFO] che-server image: ${CHE_SERVER_IMAGE}"
 
-cat <<EOF | kubectl patch -n "${CHE_NAMESPACE}" "checluster/${CHECLUSTER_NAME}" --type=json -p "$(cat)"
-[
-  {
-    "op": "replace",
-    "path": "/spec/components/cheServer/deployment",
-    "value": {
-      "containers": [
-        {
-          "image": "${CHE_SERVER_IMAGE}",
-          "imagePullPolicy": "Always",
-          "name": "che-server"
-        }
-      ]
-    }
-  }
-]
-EOF
+CHECLUSTER_JSON="$(kubectl get checluster -n "${CHE_NAMESPACE}" "${CHECLUSTER_NAME}" -o json)"
+
+# If spec.components.cheServer.deployment.containers[0].image doesn't exist, jq returns "null".
+CURRENT_IMAGE="$(echo "${CHECLUSTER_JSON}" | jq -r '.spec.components.cheServer.deployment.containers[0].image // "null"')"
+HAS_CHESERVER="$(echo "${CHECLUSTER_JSON}" | jq -r '.spec.components.cheServer != null')"
+HAS_DEPLOYMENT="$(echo "${CHECLUSTER_JSON}" | jq -r '.spec.components.cheServer.deployment != null')"
+
+if [[ "${HAS_CHESERVER}" != "true" ]]; then
+  # Extremely defensive: CheCluster should always have cheServer, but handle it anyway.
+  kubectl patch -n "${CHE_NAMESPACE}" "checluster/${CHECLUSTER_NAME}" --type=json \
+    -p="[{\"op\":\"add\",\"path\":\"/spec/components/cheServer\",\"value\":{\"deployment\":{\"containers\":[{\"image\":\"${CHE_SERVER_IMAGE}\",\"imagePullPolicy\":\"Always\",\"name\":\"che-server\"}]}}}]"
+elif [[ "${HAS_DEPLOYMENT}" != "true" || "${CURRENT_IMAGE}" == "null" ]]; then
+  # Default CheCluster often has cheServer without 'deployment'. Add the missing field.
+  kubectl patch -n "${CHE_NAMESPACE}" "checluster/${CHECLUSTER_NAME}" --type=json \
+    -p="[{\"op\":\"add\",\"path\":\"/spec/components/cheServer/deployment\",\"value\":{\"containers\":[{\"image\":\"${CHE_SERVER_IMAGE}\",\"imagePullPolicy\":\"Always\",\"name\":\"che-server\"}]}}]"
+else
+  # Deployment exists; just replace the image.
+  kubectl patch -n "${CHE_NAMESPACE}" "checluster/${CHECLUSTER_NAME}" --type=json \
+    -p="[{\"op\":\"replace\",\"path\":\"/spec/components/cheServer/deployment/containers/0/image\",\"value\":\"${CHE_SERVER_IMAGE}\"},{\"op\":\"replace\",\"path\":\"/spec/components/cheServer/deployment/containers/0/imagePullPolicy\",\"value\":\"Always\"}]"
+fi
 
 echo "[INFO] Patch applied."
 echo "[INFO] Current CheCluster che-server image:"
