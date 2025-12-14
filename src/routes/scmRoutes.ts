@@ -48,12 +48,12 @@ The response includes Content-Disposition header to trigger file download in bro
 
 **Devfile from Bitbucket:**
 \`\`\`
-/scm/resolve?repository=https://oorel@bitbucket.org/oorel/oorel1.git&file=devfile.yaml
+/scm/resolve?repository=https://bitbucket.org/workspace/repository&file=devfile.yaml
 \`\`\`
 
 **Che Editor from Bitbucket:**
 \`\`\`
-/scm/resolve?repository=https://oorel@bitbucket.org/oorel/oorel1.git&file=.che/che-editor.yaml
+/scm/resolve?repository=https://bitbucket.org/workspace/repository&file=.che/che-editor.yaml
 \`\`\`
 
 **Devfile from GitHub:**
@@ -75,7 +75,7 @@ The response includes Content-Disposition header to trigger file download in bro
               description: `Repository URL. Supported formats:
 - **GitHub**: https://github.com/user/repo or https://github.com/user/repo.git
 - **GitLab**: https://gitlab.com/user/repo or https://gitlab.com/user/repo.git
-- **Bitbucket**: https://bitbucket.org/workspace/repo or https://oorel@bitbucket.org/oorel/oorel1.git
+- **Bitbucket**: https://bitbucket.org/workspace/repo
 - **GitHub Enterprise**: https://github.enterprise.com/user/repo
 - **Self-hosted GitLab**: https://gitlab.example.com/user/repo
 - **Direct raw URL**: https://raw.githubusercontent.com/user/repo/main/devfile.yaml`,

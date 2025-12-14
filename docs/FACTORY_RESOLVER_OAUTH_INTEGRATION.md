@@ -13,7 +13,7 @@ User Request (Private Repo)
     ↓
 POST /factory/resolver
     {
-      "url": "https://oorel@bitbucket.org/oorel/oorel1.git"
+      "url": "https://bitbucket.org/workspace/repository"
     }
     ↓
 FactoryService.resolveFactory()
@@ -274,7 +274,7 @@ POST /api/factory/resolver
 Content-Type: application/json
 
 {
-  "url": "https://oorel@bitbucket.org/oorel/oorel1.git"
+  "url": "https://bitbucket.org/workspace/repository"
 }
 ```
 
@@ -539,7 +539,7 @@ Each SCM provider requests appropriate OAuth scopes:
 curl -X POST 'http://localhost:8080/api/factory/resolver' \
   -H 'Content-Type: application/json' \
   -d '{
-    "url": "https://oorel@bitbucket.org/oorel/oorel1.git"
+  "url": "https://bitbucket.org/workspace/repository"
   }'
 ```
 
@@ -563,7 +563,7 @@ curl -X POST 'http://localhost:8080/api/factory/resolver' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer <your_bitbucket_token>' \
   -d '{
-    "url": "https://oorel@bitbucket.org/oorel/oorel1.git"
+    "url": "https://bitbucket.org/workspace/repository"
   }'
 ```
 
