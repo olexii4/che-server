@@ -184,7 +184,7 @@ export IMAGE_TAG=next
 # Use a temporary copy with relaxed permissions instead:
 #   cp ~/.kube/config /tmp/che-kubeconfig && chmod 644 /tmp/che-kubeconfig
 #   export SERVICE_ACCOUNT_TOKEN="$(oc whoami -t)"   # optional but recommended for some flows
-#   ./scripts/container_tool.sh run -p 8080:8080 \
+#   ./scripts/container_tool.sh run --rm -p 8080:8080 \
 #     -e LOCAL_RUN=true \
 #     -e KUBECONFIG=/tmp/che-kubeconfig \
 #     -e SERVICE_ACCOUNT_TOKEN="${SERVICE_ACCOUNT_TOKEN}" \
