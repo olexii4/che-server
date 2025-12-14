@@ -115,7 +115,7 @@ yarn build
 
 ```bash
 # Use the startup script (recommended)
-./start-local-dev.sh
+./run/start-local-dev.sh
 
 # Or manually
 export LOCAL_RUN=true
@@ -290,7 +290,7 @@ che-server/
 - `yarn test:coverage` - Run tests with coverage
 
 ### Utility Scripts
-- `./scripts/setup-rbac.sh` - Set up RBAC permissions for che-server ServiceAccount
+- `./scripts/patch-che-server-image.sh` - Patch CheCluster to use a custom che-server image
 
 ## Documentation Files
 

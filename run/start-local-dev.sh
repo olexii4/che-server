@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) 2018-2025 Red Hat, Inc.
+# This program and the accompanying materials are made
+# available under the terms of the Eclipse Public License 2.0
+# which is available at https://www.eclipse.org/legal/epl-2.0/
+#
+# SPDX-License-Identifier: EPL-2.0
+#
+# Contributors:
+#   Red Hat, Inc. - initial API and implementation
+#
+# Start che-server locally in LOCAL_RUN mode.
+#
+# Usage:
+#   ./run/start-local-dev.sh
+#
+set -euo pipefail
+
+echo "Starting che-server in LOCAL_RUN mode"
+echo "====================================="
+echo ""
+
+if [[ ! -f "${HOME}/.kube/config" ]]; then
+  echo "[WARN] ~/.kube/config not found; ensure you have a valid kubeconfig"
+  echo ""
+fi
+
+if command -v kubectl >/dev/null 2>&1; then
+  if kubectl cluster-info >/dev/null 2>&1; then
+    echo "[INFO] Connected to Kubernetes cluster:"
+    kubectl cluster-info 2>/dev/null | head -1 || true
+    echo ""
+  else
+    echo "[WARN] Not connected to a Kubernetes cluster (kubectl cluster-info failed)"
+    echo ""
+  fi
+else
+  echo "[WARN] kubectl not found; local dev may not work as expected"
+  echo ""
+fi
+
+echo "Environment:"
+echo "  LOCAL_RUN=true"
+echo "  NODE_ENV=development"
+echo ""
+
+if command -v lsof >/dev/null 2>&1; then
+  if lsof -ti tcp:8080 >/dev/null 2>&1; then
+    echo "[INFO] Stopping existing process on port 8080..."
+    lsof -ti tcp:8080 | xargs kill 2>/dev/null || true
+    sleep 1
+  fi
+fi
+
+if [[ -z "${SERVICE_ACCOUNT_TOKEN:-}" ]]; then
+  echo "[WARN] SERVICE_ACCOUNT_TOKEN not set."
+  echo "       Some local flows may require a token with cluster permissions."
+  echo "       Example (OpenShift): export SERVICE_ACCOUNT_TOKEN=\$(oc whoami -t)"
+  echo ""
+fi
+
+export LOCAL_RUN=true
+
+echo "[INFO] Building and starting server..."
+yarn build:dev && yarn start:debug
+
+

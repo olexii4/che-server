@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Copyright (c) 2025 Red Hat, Inc.
 # This program and the accompanying materials are made
@@ -30,7 +30,7 @@
 #   CHE_SERVER_IMAGE        - Override full image name (optional)
 #
 
-set -e
+set -euo pipefail
 
 # Validate required environment variables
 if [[ -z "$IMAGE_REGISTRY_HOST" ]]; then
@@ -73,24 +73,11 @@ echo "[INFO] Patching CheCluster with new che-server image '${CHE_SERVER_IMAGE}'
 CHE_NAMESPACE="${CHE_NAMESPACE:-eclipse-che}"
 
 # Get the CheCluster name
-CHECLUSTER_CR_NAME=$(kubectl get checluster -n "$CHE_NAMESPACE" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "eclipse-che")
+CHECLUSTER_CR_NAME="$(kubectl get checluster -n "$CHE_NAMESPACE" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "eclipse-che")"
 
-# Get previous image (if any)
-PREVIOUS_CHE_SERVER_IMAGE=$(kubectl get checluster -n "$CHE_NAMESPACE" "$CHECLUSTER_CR_NAME" -o=json 2>/dev/null | jq -r '.spec.components.cheServer.deployment.containers[0].image // "null"')
-
-echo "[INFO] Previous che-server image: ${PREVIOUS_CHE_SERVER_IMAGE}"
-echo "[INFO] New che-server image: ${CHE_SERVER_IMAGE}"
-
-# Patch the CheCluster
-if [ "$PREVIOUS_CHE_SERVER_IMAGE" == "null" ]; then
-  # No existing custom image, create the structure
-  kubectl patch -n "$CHE_NAMESPACE" "checluster/$CHECLUSTER_CR_NAME" --type=json \
-    -p="[{\"op\": \"replace\", \"path\": \"/spec/components/cheServer\", \"value\": {deployment: {containers: [{image: \"${CHE_SERVER_IMAGE}\", imagePullPolicy: \"Always\", name: \"che-server\"}]}}}]"
-else
-  # Update existing custom image
-  kubectl patch -n "$CHE_NAMESPACE" "checluster/$CHECLUSTER_CR_NAME" --type=json \
-    -p="[{\"op\": \"replace\", \"path\": \"/spec/components/cheServer/deployment/containers/0/image\", \"value\": \"${CHE_SERVER_IMAGE}\"}]"
-fi
+# Reuse the shared patch script (handles missing spec.components.cheServer.deployment)
+CHE_NAMESPACE="${CHE_NAMESPACE}" CHECLUSTER_NAME="${CHECLUSTER_CR_NAME}" CHE_SERVER_IMAGE="${CHE_SERVER_IMAGE}" \
+  "${PWD}/scripts/patch-che-server-image.sh"
 
 echo ""
 echo "[SUCCESS] CheCluster patched successfully!"

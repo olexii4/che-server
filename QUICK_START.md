@@ -15,7 +15,7 @@ ENOENT: no such file or directory, open '/var/run/secrets/kubernetes.io/servicea
 ### Option 1: Use the Startup Script (Recommended)
 
 ```bash
-./start-local-dev.sh
+./run/start-local-dev.sh
 ```
 
 This script will:
@@ -74,7 +74,7 @@ Server runs on your machine
 
 ### Error: "no such file or directory, open '/var/run/secrets/...'"
 **Cause:** `LOCAL_RUN` is not set - server is trying to load [in-cluster service account credentials](https://kubernetes.io/docs/tasks/run-application/access-api-from-pod/)  
-**Fix:** Set `LOCAL_RUN=true` or use `./start-local-dev.sh` to use local kubeconfig instead
+**Fix:** Set `LOCAL_RUN=true` or use `./run/start-local-dev.sh` to use local kubeconfig instead
 
 ### Error: "no current context is found"
 **Cause:** No valid kubeconfig  
@@ -86,7 +86,7 @@ Server runs on your machine
 
 ### Error: "Forbidden: User cannot list resource namespaces at cluster scope"
 **Cause:** Your token/user doesn't have permission to list namespaces  
-**Fix:** Grant permissions with `./grant-namespace-permissions.sh` or see `docs/RBAC_PERMISSIONS.md`
+**Fix:** Grant permissions (RBAC) or see `docs/RBAC_PERMISSIONS.md`
 
 ### Error: "connect ECONNREFUSED"
 **Cause:** Can't connect to Kubernetes cluster  
@@ -144,5 +144,5 @@ curl -X GET http://localhost:8080/api/kubernetes/namespace \
 
 - See [README.md](README.md) for full documentation
 - See [docs/REQUEST_TOKEN_AUTHENTICATION.md](docs/REQUEST_TOKEN_AUTHENTICATION.md) for authentication details
-- Run `./test-real-kubernetes-token.sh` to test authentication
+- Use Swagger (`/swagger`) or curl to test endpoints
 

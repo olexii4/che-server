@@ -113,7 +113,7 @@ yarn dev
 Or use the helper script:
 
 ```bash
-./start-local-dev.sh
+./run/start-local-dev.sh
 ```
 
 ### What Gets Loaded
@@ -260,7 +260,7 @@ kubectl exec -it che-server-pod -- \
 ### Development
 
 1. ✅ **Always use `LOCAL_RUN=true`** when developing locally
-2. ✅ Use `./start-local-dev.sh` to ensure correct setup
+2. ✅ Use `./run/start-local-dev.sh` to ensure correct setup
 3. ✅ Test with real Kubernetes tokens to verify RBAC
 4. ✅ Document any RBAC permissions needed
 

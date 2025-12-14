@@ -55,7 +55,7 @@ rules:
 
 ## Example ClusterRole and ClusterRoleBinding
 
-For the che-server ServiceAccount to provision namespaces and configure RBAC + user-profile secrets, you need permissions for namespaces, rolebindings, and secrets:
+If you need to grant permissions, apply RBAC manifests directly (this repo no longer ships helper RBAC scripts).
 
 ```yaml
 ---
@@ -145,7 +145,6 @@ We provide helper scripts to quickly grant permissions:
 ### Grant Namespace Permissions
 
 ```bash
-./scripts/grant-namespace-permissions.sh
 ```
 
 This grants permissions to list, create, and manage namespaces.
@@ -153,7 +152,6 @@ This grants permissions to list, create, and manage namespaces.
 ### Grant DevWorkspace Permissions
 
 ```bash
-./scripts/grant-devworkspace-permissions.sh
 ```
 
 This grants permissions to manage DevWorkspace CRDs (devworkspaces, devworkspacetemplates, etc.).
@@ -175,7 +173,7 @@ oc adm policy add-cluster-role-to-user cluster-admin $(oc whoami)
 **Solution**: 
 1. Grant `che-user` ClusterRole to the user (see above)
 2. OR: Use a service account token with proper permissions for local development
-3. OR: Run `./scripts/grant-namespace-permissions.sh`
+3. OR: Apply the RBAC YAML manually (see examples in this document)
 
 ### "User cannot list resource devworkspaces"
 
@@ -183,7 +181,7 @@ oc adm policy add-cluster-role-to-user cluster-admin $(oc whoami)
 
 **Solution**:
 1. Grant `devworkspace-admin` ClusterRole to the user (see above)
-2. OR: Run `./scripts/grant-devworkspace-permissions.sh`
+2. OR: Apply the RBAC YAML manually (see examples in this document)
 
 ### Getting a Service Account Token for Testing
 

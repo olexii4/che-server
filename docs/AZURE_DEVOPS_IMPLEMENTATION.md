@@ -23,7 +23,6 @@ Azure DevOps support has been added to the Factory Resolver OAuth integration, p
    - Added Azure DevOps file resolver code example
 
 4. **Test Scripts**
-   - Created `test-azure-devops-private-repo.sh` for manual testing
 
 ## Azure DevOps URL Formats
 
@@ -229,7 +228,7 @@ yarn test --testPathPattern="ScmFileResolvers" --testNamePattern="AzureDevOps"
 Use the provided test script:
 
 ```bash
-./test-azure-devops-private-repo.sh
+Use your preferred HTTP client (curl/Postman) to test Azure DevOps private repo access via `/api/factory/resolver`.
 ```
 
 ## Comparison with Other Providers
