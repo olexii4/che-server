@@ -3,6 +3,9 @@
 # Demonstrates the fixed devfile URL handling
 ###
 
+@baseUrl = http://localhost:8080/api
+@token = user123:johndoe
+
 ### Example 1: GitHub Repository URL (NEW - Now Works!)
 # Before fix: Required full URL like https://github.com/user/repo/blob/main/devfile.yaml
 # After fix: Automatically tries devfile.yaml and .devfile.yaml
@@ -97,8 +100,6 @@ Authorization: Bearer {{token}}
 
 ###
 # Variables
-# Set these in your HTTP client settings or .env file
-###
-# baseUrl=http://localhost:8080
-# token=your-bearer-token
+# - baseUrl defaults to localhost che-server (/api)
+# - token uses the che-server "test Bearer" format: <userid>:<username>
 

@@ -1,23 +1,32 @@
-### Test script for REST Client (VS Code) or IntelliJ HTTP Client
-### Install "REST Client" extension in VS Code to use this file
+### che-server example requests (VS Code REST Client / IntelliJ HTTP Client)
+###
+### Local testing:
+### - Start server: ./run/start-local-dev.sh
+### - For auth in local mode you can use the "test Bearer" format supported by che-server:
+###     Authorization: Bearer <userid>:<username>
+### - Namespace endpoints also require SERVICE_ACCOUNT_TOKEN for local runs:
+###     export SERVICE_ACCOUNT_TOKEN="$(oc whoami -t)"
 
 @baseUrl = http://localhost:8080/api
 @username = johndoe
 @userid = user123
+@bearer = {{userid}}:{{username}}
+@basic = am9obmRvZTp1c2VyMTIz
 
 ### Provision Namespace (Bearer Token)
 POST {{baseUrl}}/kubernetes/namespace/provision
-Authorization: Bearer {{userid}}:{{username}}
+Authorization: Bearer {{bearer}}
 Content-Type: application/json
 
 ### Provision Namespace (Basic Auth)
 POST {{baseUrl}}/kubernetes/namespace/provision
-Authorization: Basic {{username}}:{{userid}}
+### basic is base64("{{username}}:{{userid}}")
+Authorization: Basic {{basic}}
 Content-Type: application/json
 
 ### List Namespaces
 GET {{baseUrl}}/kubernetes/namespace
-Authorization: Bearer {{userid}}:{{username}}
+Authorization: Bearer {{bearer}}
 
 ### Provision for Different User
 POST {{baseUrl}}/kubernetes/namespace/provision
@@ -30,7 +39,7 @@ Content-Type: application/json
 
 ### Resolve Factory from URL
 POST {{baseUrl}}/factory/resolver
-Authorization: Bearer {{userid}}:{{username}}
+Authorization: Bearer {{bearer}}
 Content-Type: application/json
 
 {
@@ -39,7 +48,7 @@ Content-Type: application/json
 
 ### Resolve Factory with Validation
 POST {{baseUrl}}/factory/resolver?validate=true
-Authorization: Bearer {{userid}}:{{username}}
+Authorization: Bearer {{bearer}}
 Content-Type: application/json
 
 {
@@ -48,7 +57,7 @@ Content-Type: application/json
 
 ### Refresh Factory Token
 POST {{baseUrl}}/factory/token/refresh?url=https://github.com/user/repo
-Authorization: Bearer {{userid}}:{{username}}
+Authorization: Bearer {{bearer}}
 Content-Type: application/json
 
 ### System State
@@ -56,7 +65,7 @@ GET {{baseUrl}}/system/state
 
 ### Resolve Factory without Parameters (should fail)
 POST {{baseUrl}}/factory/resolver
-Authorization: Bearer {{userid}}:{{username}}
+Authorization: Bearer {{bearer}}
 Content-Type: application/json
 
 {}
