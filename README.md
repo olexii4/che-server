@@ -174,8 +174,22 @@ export IMAGE_TAG=next
 # Build image (Docker or Podman via container_tool.sh)
 ./scripts/container_tool.sh build -f build/dockerfiles/Dockerfile -t docker.io/olexii4dockerid/che-server:next .
 
-# Run locally (Docker or Podman via container_tool.sh)
-./scripts/container_tool.sh run -p 8080:8080 docker.io/olexii4dockerid/che-server:next
+# Run locally
+#
+# Recommended (dev mode, uses your local kubeconfig):
+./run/start-local-dev.sh
+#
+# Advanced: run the container locally (requires LOCAL_RUN + a readable kubeconfig file).
+# NOTE: mounting ~/.kube/config directly often fails due to file permissions inside the container.
+# Use a temporary copy with relaxed permissions instead:
+#   cp ~/.kube/config /tmp/che-kubeconfig && chmod 644 /tmp/che-kubeconfig
+#   export SERVICE_ACCOUNT_TOKEN="$(oc whoami -t)"   # optional but recommended for some flows
+#   ./scripts/container_tool.sh run -p 8080:8080 \
+#     -e LOCAL_RUN=true \
+#     -e KUBECONFIG=/tmp/che-kubeconfig \
+#     -e SERVICE_ACCOUNT_TOKEN="${SERVICE_ACCOUNT_TOKEN}" \
+#     -v /tmp/che-kubeconfig:/tmp/che-kubeconfig:ro \
+#     docker.io/olexii4dockerid/che-server:next
 ```
 
 **📖 For detailed build instructions, see [build/README.md](build/README.md)**
