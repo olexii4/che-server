@@ -1,4 +1,14 @@
 #!/usr/bin/env bash
+#
+# Copyright (c) 2025 Red Hat, Inc.
+# This program and the accompanying materials are made
+# available under the terms of the Eclipse Public License 2.0
+# which is available at https://www.eclipse.org/legal/epl-2.0/
+#
+# SPDX-License-Identifier: EPL-2.0
+#
+# Contributors:
+#   Red Hat, Inc. - initial API and implementation
 
 set -euo pipefail
 
@@ -6,7 +16,7 @@ set -euo pipefail
 #
 # Notes:
 # - When running che-server locally via ./run/start-local-dev.sh, you typically need:
-#     export SERVICE_ACCOUNT_TOKEN="$(oc whoami -t)"
+#     export USER_TOKEN="$(oc whoami -t)"
 #   otherwise namespace endpoints may fail because che-server can't talk to the cluster API.
 # - For local testing, che-server supports a "test" Bearer token format:
 #     Authorization: Bearer <userid>:<username>
@@ -114,5 +124,5 @@ echo ""
 echo "Note: If you see errors, make sure:"
 echo "  1. The API server is running (use ./run/start-local-dev.sh)"
 echo "  2. jq is installed for pretty JSON output (optional)"
-echo "  3. For local runs: export SERVICE_ACCOUNT_TOKEN=\"\$(oc whoami -t)\""
+echo "  3. For local runs: export USER_TOKEN=\"\$(oc whoami -t)\""
 

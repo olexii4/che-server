@@ -53,10 +53,10 @@ if command -v lsof >/dev/null 2>&1; then
   fi
 fi
 
-if [[ -z "${SERVICE_ACCOUNT_TOKEN:-}" ]]; then
-  echo "[WARN] SERVICE_ACCOUNT_TOKEN not set."
+if [[ -z "${USER_TOKEN:-}" && -z "${SERVICE_ACCOUNT_TOKEN:-}" ]]; then
+  echo "[WARN] USER_TOKEN not set."
   echo "       Some local flows may require a token with cluster permissions."
-  echo "       Example (OpenShift): export SERVICE_ACCOUNT_TOKEN=\$(oc whoami -t)"
+  echo "       Example (OpenShift): export USER_TOKEN=\$(oc whoami -t)"
   echo ""
 fi
 

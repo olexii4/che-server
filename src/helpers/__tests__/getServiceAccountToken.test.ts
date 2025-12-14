@@ -62,13 +62,21 @@ describe('getServiceAccountToken', () => {
         process.env.LOCAL_RUN = 'true';
       });
 
-      it('should return SERVICE_ACCOUNT_TOKEN from env', () => {
-        process.env.SERVICE_ACCOUNT_TOKEN = 'local-test-token';
+      it('should return USER_TOKEN from env', () => {
+        process.env.USER_TOKEN = 'local-user-token';
         const token = getServiceAccountToken();
-        expect(token).toBe('local-test-token');
+        expect(token).toBe('local-user-token');
       });
 
-      it('should return empty string if SERVICE_ACCOUNT_TOKEN is not set', () => {
+      it('should fall back to SERVICE_ACCOUNT_TOKEN env var (legacy)', () => {
+        delete process.env.USER_TOKEN;
+        process.env.SERVICE_ACCOUNT_TOKEN = 'local-legacy-token';
+        const token = getServiceAccountToken();
+        expect(token).toBe('local-legacy-token');
+      });
+
+      it('should return empty string if USER_TOKEN/SERVICE_ACCOUNT_TOKEN are not set', () => {
+        delete process.env.USER_TOKEN;
         delete process.env.SERVICE_ACCOUNT_TOKEN;
         const token = getServiceAccountToken();
         expect(token).toBe('');

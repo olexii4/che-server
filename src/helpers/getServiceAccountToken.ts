@@ -23,7 +23,7 @@ export const SERVICE_ACCOUNT_TOKEN_PATH = '/run/secrets/kubernetes.io/serviceacc
  * users might not have.
  *
  * In production (running in a pod): Reads from /run/secrets/kubernetes.io/serviceaccount/token
- * In local development (LOCAL_RUN=true): Uses SERVICE_ACCOUNT_TOKEN env var
+ * In local development (LOCAL_RUN=true): Uses USER_TOKEN (preferred) or SERVICE_ACCOUNT_TOKEN (legacy) env var
  *
  * Pattern based on:
  * https://github.com/eclipse-che/che-dashboard/blob/main/packages/dashboard-backend/src/routes/api/helpers/getServiceAccountToken.ts
@@ -38,10 +38,10 @@ export function getServiceAccountToken(): string {
   const isLocalRun = process.env.LOCAL_RUN === 'true';
 
   if (isLocalRun) {
-    const token = process.env.SERVICE_ACCOUNT_TOKEN;
+    const token = process.env.USER_TOKEN || process.env.SERVICE_ACCOUNT_TOKEN;
     if (!token) {
       logger.warn(
-        'SERVICE_ACCOUNT_TOKEN not set for local run. Namespace listing may fail without proper permissions.',
+        'USER_TOKEN not set for local run. Namespace listing may fail without proper permissions.',
       );
       return '';
     }
@@ -51,8 +51,8 @@ export function getServiceAccountToken(): string {
   if (!existsSync(SERVICE_ACCOUNT_TOKEN_PATH)) {
     logger.fatal(
       `SERVICE_ACCOUNT_TOKEN is required but ${SERVICE_ACCOUNT_TOKEN_PATH} does not exist.\n` +
-        `  Running locally? Set LOCAL_RUN=true and SERVICE_ACCOUNT_TOKEN env vars.\n` +
-        `  Example: export LOCAL_RUN=true && export SERVICE_ACCOUNT_TOKEN=$(oc whoami -t)`,
+        `  Running locally? Set LOCAL_RUN=true and USER_TOKEN env vars.\n` +
+        `  Example: export LOCAL_RUN=true && export USER_TOKEN=$(oc whoami -t)`,
     );
     process.exit(1);
   }

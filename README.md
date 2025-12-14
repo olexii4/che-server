@@ -183,11 +183,11 @@ export IMAGE_TAG=next
 # NOTE: mounting ~/.kube/config directly often fails due to file permissions inside the container.
 # Use a temporary copy with relaxed permissions instead:
 #   cp ~/.kube/config /tmp/che-kubeconfig && chmod 644 /tmp/che-kubeconfig
-#   export SERVICE_ACCOUNT_TOKEN="$(oc whoami -t)"   # optional but recommended for some flows
+#   export USER_TOKEN="$(oc whoami -t)"   # optional but recommended for some flows
 #   ./scripts/container_tool.sh run --rm -p 8080:8080 \
 #     -e LOCAL_RUN=true \
 #     -e KUBECONFIG=/tmp/che-kubeconfig \
-#     -e SERVICE_ACCOUNT_TOKEN="${SERVICE_ACCOUNT_TOKEN}" \
+#     -e USER_TOKEN="${USER_TOKEN}" \
 #     -v /tmp/che-kubeconfig:/tmp/che-kubeconfig:ro \
 #     docker.io/olexii4dockerid/che-server:next
 ```

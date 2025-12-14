@@ -212,6 +212,6 @@ fastify.post('/kubernetes/namespace/provision', async (request, reply) => {
 ## 📚 References
 
 - Java Implementation: `che-server/infrastructures/kubernetes/src/main/java/org/eclipse/che/workspace/infrastructure/kubernetes/`
-- Service Account Token: `/run/secrets/kubernetes.io/serviceaccount/token` (in-cluster) or `SERVICE_ACCOUNT_TOKEN` env var (local)
+- Service Account Token: `/run/secrets/kubernetes.io/serviceaccount/token` (in-cluster) or `USER_TOKEN` env var (local; `SERVICE_ACCOUNT_TOKEN` legacy alias)
 - Kubernetes RBAC: See `docs/RBAC_PERMISSIONS.md`
 
