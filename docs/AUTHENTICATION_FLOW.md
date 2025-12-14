@@ -75,38 +75,18 @@ Authorization: Bearer user123:johndoe
 **Result:**
 - User ID: `user123`
 - Username: `johndoe`
-- Namespace: `johndoe-che`
+- Namespace: depends on `NAMESPACE_TEMPLATE` (in Che installs it is typically `<username>-che`)
 
 ---
 
-### 4. Basic Authentication
-
-**Used when:** Alternative authentication method
-
-**Example:**
-```http
-GET /api/kubernetes/namespace
-Authorization: Bearer user123:johndoe
-```
-
-Base64 decodes to: `johndoe:user123`
-
-**Result:**
-- User ID: `user123`
-- Username: `johndoe`
-- Namespace: `johndoe-che`
-
----
-
-### 5. Raw Kubernetes Token ✅ **Direct API Access**
+### 4. Raw Bearer Token (non-JWT, e.g. OpenShift `sha256~...`)
 
 **Used when:** Direct API access with service account or user token
 
 **How it works:**
 - Client sends Kubernetes token (e.g., `sha256~...`) in Authorization header
-- Server calls Kubernetes TokenReview API to validate and extract username
-- Username is cleaned up (removes `system:`, `kube:` prefixes)
-- Namespace created with correct username
+- **TokenReview is disabled** in this Node che-server implementation (to avoid cluster-wide RBAC requirements).
+- If the token is **not a JWT** and does not match the test format (`id:username`), che-server cannot extract a username and will fall back to `che-user`.
 
 **Example:**
 ```http
@@ -114,60 +94,15 @@ GET /api/kubernetes/namespace/provision
 Authorization: Bearer sha256~zpxqr6PzbWNyTzX7d4mUfiONB0-QSLn7-JQFsiMF0S8
 ```
 
-**TokenReview API Response:**
-```json
-{
-  "status": {
-    "authenticated": true,
-    "user": {
-      "username": "kube:admin"
-    }
-  }
-}
-```
-
 **Result:**
-- ✅ Username extracted: `admin` (cleaned from `kube:admin`)
-- ✅ Namespace created: `admin-che`
-- ✅ User profile: `{username: "admin", email: "admin@che.local"}`
-
-**Fallback:**
-If TokenReview API fails, defaults to `che-user` as username.
+- ⚠️ Username falls back to: `che-user`
+- ⚠️ Namespace uses the fallback username (depends on `NAMESPACE_TEMPLATE`)
 
 ---
 
 ## Deployment Recommendations
 
-### ✅ Production (Direct API Access) - **Recommended for Customers**
-
-**Setup:**
-1. Deploy Che Server in Kubernetes/OpenShift
-2. Expose API at: `https://che-server-pod:8080/api/`
-3. Clients authenticate with Kubernetes tokens
-4. Server uses TokenReview API to extract usernames
-
-**URL Structure:**
-```
-User/Client → Che Server API (Direct)
-                    ↓
-            TokenReview API validates token
-                    ↓
-            Username extracted automatically
-```
-
-**Authentication Flow:**
-```
-1. Client accesses: https://che-server-pod:8080/api/kubernetes/namespace/provision
-2. Client sends: Authorization: Bearer sha256~abc123...
-3. Che Server calls TokenReview API
-4. TokenReview returns: username = "kube:admin"
-5. Server cleans username: "admin"
-6. Namespace created: admin-che ✅
-```
-
----
-
-### 🧪 Testing with Eclipse Che Gateway
+### ✅ Production - Eclipse Che Gateway (recommended)
 
 **Setup:**
 1. Deploy Eclipse Che with Gateway enabled (test environments)
@@ -196,7 +131,7 @@ User/Client → Che Server API (Direct)
      -H 'Authorization: Bearer admin:admin'
    ```
 
-2. **Use JWT tokens from local Keycloak:**
+2. **Use JWT tokens from local Keycloak (if you have one):**
    ```bash
    TOKEN=$(curl -X POST 'http://localhost:8180/realms/che/protocol/openid-connect/token' \
      -d 'username=admin&password=admin&grant_type=password&client_id=che-public')
@@ -211,32 +146,28 @@ User/Client → Che Server API (Direct)
      -H 'gap-auth: kubeadmin'
    ```
 
+4. **Local Kubernetes access for namespace operations**:
+   If you run che-server locally but want it to talk to a cluster API, set:
+   ```bash
+   export USER_TOKEN="$(oc whoami -t)"
+   ```
+
 ---
 
 ## Troubleshooting
 
-### Problem: Wrong namespace name (`che-user-che` instead of `kubeadmin-che`)
+### Problem: Wrong namespace name (fallback `che-user`)
 
 **Possible causes:**
-1. TokenReview API is not accessible from the pod
-2. Token doesn't have sufficient permissions
-3. TokenReview API call failed
+1. You used a **non-JWT** bearer token (e.g. `sha256~...`) and che-server could not extract username
+2. Gateway identity headers are missing (`gap-auth` / `x-forwarded-user`)
 
 **Solutions:**
-1. **Check TokenReview API access:**
-   ```bash
-   kubectl auth can-i create tokenreviews.authentication.k8s.io --as=system:serviceaccount:eclipse-che:che
-   ```
-
-2. **Check pod logs for TokenReview errors:**
-   ```bash
-   kubectl logs -n eclipse-che deployment/che-server | grep TokenReview
-   ```
-
-3. **Verify RBAC permissions:**
-   The Che service account needs permission to create TokenReview objects.
-   
-4. **Fallback to gap-auth (testing):**
+1. **Use gateway headers** (production):
+   Access through the Che Dashboard / Gateway (it injects identity headers).
+2. **Use test token format** (local):
+   `Authorization: Bearer user123:johndoe`
+3. **Simulate gateway header** (local):
    ```bash
    curl -H 'gap-auth: kubeadmin' ...
    ```

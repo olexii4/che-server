@@ -2,14 +2,12 @@
 
 ## Overview
 
-This guide explains how to configure Kubernetes API clients in the che-server TypeScript implementation. The server uses **request token authentication** following the Eclipse Che Dashboard backend pattern.
+This guide explains how Kubernetes API clients are configured in this TypeScript che-server.
 
 **Authentication Modes:**
 
-1. **Production Mode (In-Cluster)** - Uses in-cluster config + request tokens
-2. **Local Development Mode** - Uses local kubeconfig + request tokens
-
-Both modes enforce per-user RBAC and multi-tenancy by using tokens from incoming HTTP requests.
+1. **Production Mode (In-Cluster)** - Uses in-cluster ServiceAccount credentials
+2. **Local Development Mode** - Uses local kubeconfig (`LOCAL_RUN=true`)
 
 ## Architecture
 
@@ -26,30 +24,25 @@ The Kubernetes client configuration is provided by multiple helper modules:
 - `getKubernetesClient(token, ApiClass)` - Get API client with user token
 - `getKubeConfig(token)` - Get KubeConfig with user token
 
-## Security Model
+## Current security model (Kubernetes API calls)
 
-The server uses **request token authentication** for all Kubernetes API calls:
-
-- **Every request** must include `Authorization: Bearer <token>` header
-- **Token extracted** from request → `request.subject.token`
-- **KubeConfig created** with user's token for each request
-- **RBAC enforced** by Kubernetes based on user's token
-
-This ensures:
-- ✅ Multi-tenancy: Each user isolated
-- ✅ RBAC: Per-user access control
-- ✅ Security: No shared credentials
-- ✅ Audit: Kubernetes logs show actual users
+- che-server uses a **Che-service-account-style token** for Kubernetes operations:
+  - **In-cluster**: the pod ServiceAccount token mounted under `/var/run/secrets/kubernetes.io/serviceaccount/`
+  - **Local development**: `USER_TOKEN="$(oc whoami -t)"` (preferred) or `SERVICE_ACCOUNT_TOKEN` (legacy alias)
+- User identity for namespace naming and user namespace selection comes from:
+  - Che Gateway identity headers (`gap-auth` / `x-forwarded-*`) in production, or
+  - test Bearer token format (`<userid>:<username>`) in local dev
 
 ## Usage
 
 ### For Route Handlers
 
-All route handlers should extract the user token and create a per-request KubeConfig:
+Route handlers that need Kubernetes access should build a KubeConfig from the che-server token:
 
 ```typescript
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { getKubeConfig } from '../helpers/getKubernetesClient';
+import { getServiceAccountToken } from '../helpers/getServiceAccountToken';
 import { KubernetesNamespaceFactory } from '../services/KubernetesNamespaceFactory';
 
 export async function registerMyRoute(fastify: FastifyInstance) {
@@ -59,19 +52,14 @@ export async function registerMyRoute(fastify: FastifyInstance) {
       onRequest: [fastify.authenticate, fastify.requireAuth],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      // Extract user token from request
-      const token = request.subject?.token;
-      if (!token) {
-        return reply.code(401).send({ error: 'Unauthorized' });
-      }
-      
-      // Create KubeConfig with user's token
+      // Use che-server token (in-cluster ServiceAccount token; local USER_TOKEN)
+      const token = getServiceAccountToken();
       const kubeConfig = getKubeConfig(token);
       
-      // Create service with user's config
+      // Create service with kubeconfig
       const factory = new KubernetesNamespaceFactory('che-<username>', kubeConfig);
       
-      // Kubernetes API calls use user's token
+      // Kubernetes API calls use che-server token
       const result = await factory.list();
       
       return reply.send(result);
@@ -110,14 +98,11 @@ export class MyKubernetesService {
 **Local Development Mode:**
 
 ```bash
-# Set local run mode
-export LOCAL_RUN=true
+# Start development server (sets LOCAL_RUN=true)
+./run/start-local-dev.sh
 
-# Optional: specify kubeconfig path (default: ~/.kube/config)
-export KUBECONFIG=~/.kube/config
-
-# Start development server
-yarn dev
+# Optional: allow local server to talk to the cluster API (for namespace endpoints)
+export USER_TOKEN="$(oc whoami -t)"
 ```
 
 ### Testing with Request Tokens
@@ -186,17 +171,12 @@ export class KubeConfigProvider {
 
 ## Production Deployment
 
-In production, the application uses **request token authentication**:
+In production, Kubernetes API calls are made using the che-server pod **ServiceAccount** (in-cluster kubeconfig / token mount).
 
-1. **Base Config (In-Cluster)**: When running as a pod
-   - Service account provides cluster info only
-   - Located at `/var/run/secrets/kubernetes.io/serviceaccount/token`
-   - Not used for API calls - only for cluster discovery
-
-2. **User Tokens (from Requests)**: For each API call
-   - Token extracted from `Authorization` header
-   - New KubeConfig created per-request with user's token
-   - Kubernetes API calls use user's token → RBAC enforced
+User identity still matters for:
+- computing user namespace name (typically `<username>-che`)
+- audit/logging
+- token storage selection (where PAT secrets are written)
 
 **Production Setup:**
 

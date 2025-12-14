@@ -27,7 +27,7 @@ The che-server is a TypeScript reimplementation of a **small subset** of the Ecl
 
 - **Authentication model**:
   - Preferred: **gateway identity headers** (`gap-auth` and common `x-forwarded-*` identity headers)
-  - Fallbacks: test/basic formats for local/dev
+  - Fallback: test token format (`Authorization: Bearer <userid>:<username>`) for local/dev
   - **TokenReview is not used** (avoids cluster-wide RBAC requirements)
 
 - **RBAC note**:
@@ -178,7 +178,7 @@ Guide for configuring Kubernetes permissions required by Che Server API endpoint
 
 **Request Token Authentication for Kubernetes** (~15KB, ~400 lines)
 
-Complete guide for using request tokens from HTTP requests to authenticate Kubernetes API calls.
+Historical exploration of using request tokens from HTTP requests to authenticate Kubernetes API calls (not current behavior).
 
 **Contents**:
 - Multi-tenancy and RBAC with request tokens
@@ -195,7 +195,7 @@ Complete guide for using request tokens from HTTP requests to authenticate Kuber
 - In-cluster production deployment
 - User isolation and RBAC enforcement
 
-**⚠️ Recommended**: This is the **production-ready approach** for multi-tenant deployments.
+**⚠️ Historical**: Kept for reference; current behavior uses che-server ServiceAccount-style Kubernetes access and Che Gateway identity headers.
 
 ### [KUBERNETES_CLIENT_DEVELOPMENT.md](KUBERNETES_CLIENT_DEVELOPMENT.md)
 
@@ -216,7 +216,7 @@ Guide for configuring Kubernetes API clients with development mode authenticatio
 - Security: Development vs Production modes
 - Integration with Eclipse Che Dashboard backend pattern
 
-**⚠️ Security**: Token authentication is **only active** when `NODE_ENV=development` (set by `yarn dev`)
+**⚠️ Note**: For local development, prefer `./run/start-local-dev.sh` (sets `LOCAL_RUN=true`). In production, user identity should come from Che Gateway headers; TokenReview is intentionally disabled.
 
 ### [NAMESPACE_PROVISIONING_IMPLEMENTATION.md](NAMESPACE_PROVISIONING_IMPLEMENTATION.md)
 

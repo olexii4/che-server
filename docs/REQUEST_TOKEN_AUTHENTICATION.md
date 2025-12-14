@@ -10,7 +10,7 @@ This document was originally written to explore a **request-token** model (dashb
 - **Kubernetes API operations** are performed using in-cluster credentials (service account kubeconfig).
 - **TokenReview is not used** (avoids cluster-wide RBAC requirements).
 
-The rest of this document is kept as **historical/reference material** and may not match current behavior line-by-line.
+The rest of this document is kept as **historical/reference material** and does not match current behavior line-by-line.
 
 ## Original overview (historical)
 
@@ -197,7 +197,7 @@ yarn start
 
 **Environment:**
 - Running on developer machine  
-- `NODE_ENV=development` (set by `yarn dev`)
+- `NODE_ENV=development` (set by `./run/start-local-dev.sh`)
 - `CLUSTER_ACCESS_TOKEN` set
 
 **Behavior:**
@@ -211,7 +211,7 @@ yarn start
 export CLUSTER_ACCESS_TOKEN=$(oc whoami -t)
 
 # Start dev server
-yarn dev
+./run/start-local-dev.sh
 
 # All requests use same token (testing only)
 ```

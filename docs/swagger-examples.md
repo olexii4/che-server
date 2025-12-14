@@ -9,7 +9,11 @@
 Start the server:
 
 ```bash
-npm run dev
+# Recommended:
+./run/start-local-dev.sh
+
+# Optional (for namespace endpoints in LOCAL_RUN mode):
+export USER_TOKEN="$(oc whoami -t)"
 ```
 
 Open your browser:
@@ -132,7 +136,7 @@ After executing a request:
 ### Use Case 1: First Time User Setup
 
 ```
-1. Start server → npm run dev
+1. Start server → ./run/start-local-dev.sh
 2. Open Swagger UI → http://localhost:8080/swagger
 3. Click Authorize → Enter "user123:johndoe"
 4. Test health → GET /health → Execute
@@ -376,7 +380,7 @@ See how long each request takes:
 1. Check server logs for YAML parsing errors
 2. Validate spec: `swagger-cli validate src/swagger/openapi.yaml`
 3. Check file exists: `ls src/swagger/openapi.yaml`
-4. Restart server: `npm run dev`
+4. Restart server: stop and re-run `./run/start-local-dev.sh`
 
 ## Best Practices
 

@@ -100,14 +100,14 @@ subjects:
 
 ### How It Works
 
-When running locally (e.g., `yarn dev`), the server uses your local `~/.kube/config` file, just like `kubectl` does.
+When running locally, the server uses your local `~/.kube/config` file, just like `kubectl` does.
 
 ### Configuration
 
 ```bash
 # Set LOCAL_RUN=true to use local kubeconfig
 export LOCAL_RUN=true
-yarn dev
+./run/start-local-dev.sh
 ```
 
 Or use the helper script:
@@ -133,45 +133,17 @@ if (this.isLocalRun) {
 ```bash
 export KUBECONFIG=/path/to/custom/kubeconfig
 export LOCAL_RUN=true
-yarn dev
+./run/start-local-dev.sh
 ```
 
-## Request-Based Token Authentication
+## Token used for Kubernetes API calls (current behavior)
 
-**Important**: In both modes, the server uses **request tokens** for authentication, not the base cluster configuration.
+The current Node.js che-server implementation uses a **Che-service-account-style token** for Kubernetes API calls:
 
-### How It Works
+- **In-cluster**: the pod ServiceAccount token mounted at `/var/run/secrets/kubernetes.io/serviceaccount/token`
+- **Local development**: `USER_TOKEN="$(oc whoami -t)"` (preferred) or `SERVICE_ACCOUNT_TOKEN` (legacy alias)
 
-1. Client sends request with `Authorization: Bearer <user-token>`
-2. Server extracts token from request
-3. Server creates a **new KubeConfig** with the user's token
-4. Server uses this KubeConfig to make Kubernetes API calls
-
-```typescript
-// src/routes/namespaceRoutes.ts
-fastify.get('/kubernetes/namespace', async (request, reply) => {
-  // Extract user token from request
-  const userToken = request.subject.token;
-  
-  // Create KubeConfig with user token
-  const userKubeConfig = getKubeConfig(userToken);
-  
-  // Use user-specific KubeConfig
-  const factory = new KubernetesNamespaceFactory(template, userKubeConfig);
-  const namespaces = await factory.list();
-  
-  return namespaces;
-});
-```
-
-### Why This Matters
-
-This approach ensures proper **multi-tenancy** and **RBAC enforcement**:
-
-- ✅ Each user's Kubernetes permissions are respected
-- ✅ Users can only see/create namespaces they have access to
-- ✅ Audit logs show the actual user performing actions
-- ✅ No privilege escalation through the che-server
+User identity (for namespace naming and user namespace selection) comes from Che Gateway identity headers (`gap-auth` / `x-forwarded-*`) or from the test Bearer token format (`<userid>:<username>`).
 
 ## Comparison Table
 
@@ -182,7 +154,7 @@ This approach ensures proper **multi-tenancy** and **RBAC enforcement**:
 | **Base Config** | Service account from `/var/run/secrets/` | Local `~/.kube/config` |
 | **CA Certificate** | `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt` | From kubeconfig |
 | **API Server** | `https://kubernetes.default.svc` | From kubeconfig |
-| **User Auth** | Request token (both modes) | Request token (both modes) |
+| **User Auth (identity)** | Gateway headers / JWT / test token | Gateway headers / JWT / test token |
 
 ## Debugging
 
@@ -208,7 +180,7 @@ grep "Loaded" server.log
 **Fix**: Set `LOCAL_RUN=true`
 
 ```bash
-LOCAL_RUN=true yarn dev
+./run/start-local-dev.sh
 ```
 
 #### Error: "Forbidden: User cannot list namespaces"
@@ -234,11 +206,12 @@ kubectl cluster-info
 
 ```bash
 # Start server
-LOCAL_RUN=true yarn dev
+./run/start-local-dev.sh
 
-# Test with your token
-TOKEN=$(oc whoami -t)  # or kubectl token
-curl -H "Authorization: Bearer ${TOKEN}" \
+# Optional: allow local server to talk to the cluster API
+export USER_TOKEN="$(oc whoami -t)"
+
+curl -H "Authorization: Bearer user123:johndoe" \
   http://localhost:8080/api/kubernetes/namespace
 ```
 
@@ -251,7 +224,7 @@ kubectl apply -f deployment.yaml
 
 # Test from within cluster
 kubectl exec -it che-server-pod -- \
-  curl -H "Authorization: Bearer ${TOKEN}" \
+  curl -H "Authorization: Bearer user123:johndoe" \
   http://localhost:8080/api/kubernetes/namespace
 ```
 

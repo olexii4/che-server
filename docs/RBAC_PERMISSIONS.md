@@ -4,7 +4,13 @@ This document describes the Kubernetes RBAC permissions required for the Eclipse
 
 ## Overview
 
-The Eclipse Che Server uses **request-based authentication**, meaning each API call uses the token from the `Authorization` header to interact with the Kubernetes API. This ensures proper RBAC enforcement - users can only access resources they have permission to.
+In production (Che deployed on Kubernetes/OpenShift), che-server performs Kubernetes operations using the **che-server pod ServiceAccount** (in-cluster kubeconfig). This matches the Java che-server behavior via `CheServerKubernetesClientFactory`.
+
+For **local development** (`LOCAL_RUN=true`), che-server cannot read the in-cluster ServiceAccount token file, so you can provide a token via:
+- `USER_TOKEN="$(oc whoami -t)"` (preferred)
+- `SERVICE_ACCOUNT_TOKEN` (legacy alias)
+
+That local token must have permissions equivalent to what the che-server ServiceAccount has in a real Che install.
 
 ## Required Permissions by Endpoint
 
@@ -26,7 +32,7 @@ rules:
 
 **Why needed**: To query namespaces with specific labels at the cluster scope.
 
-**Error if missing**:
+**Error if missing (local development)**:
 ```json
 {
   "error": "Internal Server Error",
@@ -55,7 +61,9 @@ rules:
 
 ## Example ClusterRole and ClusterRoleBinding
 
-If you need to grant permissions, apply RBAC manifests directly (this repo no longer ships helper RBAC scripts).
+If you are debugging locally against a cluster and your `USER_TOKEN` does not have sufficient permissions, you can grant them **in your cluster**.
+
+⚠️ **Note**: This repo aims to be an **image-only replacement** for Java che-server. It does **not** require creating additional cluster-wide RBAC objects for normal Che deployments; the Che Operator installation is expected to manage required permissions for the `che` ServiceAccount. The manifest below is for troubleshooting/debug only.
 
 ```yaml
 ---
@@ -89,7 +97,7 @@ subjects:
   apiGroup: rbac.authorization.k8s.io
 ```
 
-## Applying Permissions
+## Applying Permissions (debug/troubleshooting only)
 
 ### For OpenShift
 
