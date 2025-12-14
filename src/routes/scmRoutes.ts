@@ -65,7 +65,7 @@ The response includes Content-Disposition header to trigger file download in bro
 \`\`\`
 /scm/resolve?repository=https://gitlab.com/user/project&file=.vscode/extensions.json
 \`\`\``,
-        security: [{ BearerAuth: [] }, { BasicAuth: [] }],
+        security: [{ BearerAuth: [] }],
         querystring: {
           type: 'object',
           required: ['repository', 'file'],

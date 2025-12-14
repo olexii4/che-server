@@ -44,7 +44,7 @@ export async function registerOAuthRoutes(fastify: FastifyInstance): Promise<voi
         tags: ['oauth'],
         summary: 'Get registered OAuth authenticators',
         description: 'Gets list of installed OAuth authenticators',
-        security: [{ BearerAuth: [] }, { BasicAuth: [] }],
+        security: [{ BearerAuth: [] }],
         response: {
           200: {
             description: 'List of registered OAuth authenticators',
@@ -126,7 +126,7 @@ export async function registerOAuthRoutes(fastify: FastifyInstance): Promise<voi
         tags: ['oauth'],
         summary: 'Get OAuth token',
         description: 'Gets OAuth token for the authenticated user and specified provider',
-        security: [{ BearerAuth: [] }, { BasicAuth: [] }],
+        security: [{ BearerAuth: [] }],
         querystring: {
           type: 'object',
           required: ['oauth_provider'],
@@ -259,7 +259,7 @@ export async function registerOAuthRoutes(fastify: FastifyInstance): Promise<voi
         summary: 'Invalidate OAuth token',
         description:
           'Invalidates (deletes) OAuth token for the authenticated user and specified provider',
-        security: [{ BearerAuth: [] }, { BasicAuth: [] }],
+        security: [{ BearerAuth: [] }],
         querystring: {
           type: 'object',
           required: ['oauth_provider'],
@@ -395,7 +395,7 @@ export async function registerOAuthRoutes(fastify: FastifyInstance): Promise<voi
         summary: 'Initiate OAuth authentication',
         description:
           'Redirects to OAuth provider for authentication. This endpoint initiates the OAuth flow.',
-        security: [{ BearerAuth: [] }, { BasicAuth: [] }],
+        security: [{ BearerAuth: [] }],
         querystring: {
           type: 'object',
           required: ['oauth_provider'],

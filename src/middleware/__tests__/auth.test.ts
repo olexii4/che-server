@@ -64,22 +64,6 @@ describe('Authentication Middleware', () => {
       });
     });
 
-    it('should parse Basic auth', async () => {
-      const credentials = Buffer.from('johndoe:user123').toString('base64');
-      mockRequest.headers = {
-        authorization: `Basic ${credentials}`,
-      };
-
-      await authenticate(mockRequest as FastifyRequest, mockReply as FastifyReply);
-
-      expect(mockRequest.subject).toEqual({
-        id: 'user123',
-        userId: 'johndoe',
-        userName: 'johndoe',
-        token: 'johndoe:user123',
-      });
-    });
-
     it('should set subject to undefined for invalid Bearer token', async () => {
       mockRequest.headers = {
         authorization: 'Bearer invalid',
@@ -97,9 +81,10 @@ describe('Authentication Middleware', () => {
       });
     });
 
-    it('should set subject to undefined for invalid Basic auth', async () => {
+    it('should set subject to undefined for Basic auth (unsupported)', async () => {
+      const credentials = Buffer.from('johndoe:user123').toString('base64');
       mockRequest.headers = {
-        authorization: 'Basic invalid',
+        authorization: `Basic ${credentials}`,
       };
 
       await authenticate(mockRequest as FastifyRequest, mockReply as FastifyReply);

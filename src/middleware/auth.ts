@@ -16,8 +16,7 @@
  * Supports multiple authentication methods:
  * 1. Bearer token (real Kubernetes/OpenShift token): Authorization: Bearer sha256~...
  * 2. Bearer token (test format): Authorization: Bearer <userid>:<username>
- * 3. Basic auth: Authorization: Basic <base64(username:userid)>
- * 4. gap-auth header (from Eclipse Che Gateway)
+ * 3. gap-auth header (from Eclipse Che Gateway)
  */
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../utils/logger';
@@ -157,25 +156,6 @@ async function parseBearerToken(token: string): Promise<Subject | null> {
 }
 
 /**
- * Parse Basic auth format: Basic <base64(username:userid)>
- */
-function parseBasicAuth(credentials: string): Subject | null {
-  const decoded = Buffer.from(credentials, 'base64').toString('utf-8');
-  const parts = decoded.split(':');
-
-  if (parts.length !== 2) {
-    return null;
-  }
-
-  return {
-    id: parts[1], // User ID (UUID or identifier)
-    userId: parts[0], // Username
-    userName: parts[0],
-    token: decoded,
-  };
-}
-
-/**
  * Fastify hook to authenticate requests
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -250,16 +230,6 @@ export async function authenticate(request: FastifyRequest, _reply: FastifyReply
     if (subject) {
       logger.info(
         `✅ Bearer token authenticated as: userId="${subject.userId}", userName="${subject.userName}"`,
-      );
-      request.subject = subject;
-      return;
-    }
-  } else if (authHeader.startsWith('Basic ')) {
-    const credentials = authHeader.substring(6);
-    const subject = parseBasicAuth(credentials);
-    if (subject) {
-      logger.info(
-        `✅ Basic auth authenticated as: userId="${subject.userId}", userName="${subject.userName}"`,
       );
       request.subject = subject;
       return;

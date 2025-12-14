@@ -42,16 +42,6 @@ RESPONSE=$(curl -s -X POST $API_URL/kubernetes/namespace/provision \
 echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
 echo ""
 
-# Test 2: Provision Namespace (Basic Auth)
-echo -e "${BLUE}Test 2: Provision Namespace (Basic Auth)${NC}"
-echo "POST $API_URL/kubernetes/namespace/provision"
-echo "Authorization: Basic (username:$USERNAME, password:$USERID)"
-RESPONSE=$(curl -s -X POST $API_URL/kubernetes/namespace/provision \
-  -u "$USERNAME:$USERID" \
-  -H "Content-Type: application/json")
-echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
-echo ""
-
 # Test 3: List Namespaces
 echo -e "${BLUE}Test 3: List Namespaces${NC}"
 echo "GET $API_URL/kubernetes/namespace"

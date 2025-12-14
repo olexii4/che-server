@@ -32,7 +32,7 @@ export async function registerUserRoutes(fastify: FastifyInstance): Promise<void
         tags: ['user'],
         summary: 'Get current user id',
         description: 'Returns the current user identifier derived from authentication context',
-        security: [{ BearerAuth: [] }, { BasicAuth: [] }],
+                security: [{ BearerAuth: [] }],
         response: {
           200: {
             type: 'object',

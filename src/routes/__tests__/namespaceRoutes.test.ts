@@ -107,7 +107,7 @@ describe('Namespace Routes (Fastify)', () => {
       }
     });
 
-    it('should work with Basic authentication', async () => {
+    it('should return 401 for Basic authentication (unsupported)', async () => {
       const credentials = Buffer.from('johndoe:user123').toString('base64');
 
       const response = await app.inject({
@@ -118,17 +118,9 @@ describe('Namespace Routes (Fastify)', () => {
         },
       });
 
-      // May return 200 (success) or 500 (K8s permissions issue in test env)
-      expect([200, 500]).toContain(response.statusCode);
+      expect(response.statusCode).toBe(401);
       const body = JSON.parse(response.body);
-
-      if (response.statusCode === 200) {
-        // Successful provisioning
-        expect(body.name).toContain('johndoe');
-      } else {
-        // K8s permission error (expected in test environment)
-        expect(body).toHaveProperty('error');
-      }
+      expect(body.error).toBe('Unauthorized');
     });
   });
 

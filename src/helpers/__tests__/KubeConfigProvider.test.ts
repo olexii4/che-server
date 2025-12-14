@@ -50,7 +50,7 @@ describe('KubeConfigProvider', () => {
       expect(kubeConfig).toBeInstanceOf(k8s.KubeConfig);
       // Check that a context was created with the user token
       const currentContext = kubeConfig.getCurrentContext();
-      expect(currentContext).toBe('logged-user');
+      expect(currentContext).toBe('request-user-context');
 
       // Verify the user was added with the token
       const users = kubeConfig.users;

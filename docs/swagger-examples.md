@@ -24,17 +24,11 @@ Before you can test protected endpoints, you need to authenticate:
 
 1. Look for the **"Authorize"** button at the top right of the Swagger UI (🔒 icon)
 2. Click it to open the authorization dialog
-3. You'll see two options:
+3. You'll see one option:
 
-**Option A: BearerAuth (http, Bearer)**
+**BearerAuth (http, Bearer)**
 
 - Enter: `user123:johndoe`
-- Click **Authorize**
-
-**Option B: BasicAuth (http, Basic)**
-
-- Username: `johndoe`
-- Password: `user123`
 - Click **Authorize**
 
 4. Click **Close** to return to the main page
@@ -435,7 +429,7 @@ See how long each request takes:
 
 **Authorization Dialog**:
 
-- Two tabs: BearerAuth and BasicAuth
+- One tab: BearerAuth
 - Input fields for credentials
 - Authorize button
 - Close button

@@ -84,11 +84,6 @@ export async function setupSwagger(fastify: FastifyInstance): Promise<void> {
             bearerFormat: 'JWT',
             description: 'Bearer token authentication',
           },
-          BasicAuth: {
-            type: 'http',
-            scheme: 'basic',
-            description: 'Basic authentication',
-          },
         },
       },
     },

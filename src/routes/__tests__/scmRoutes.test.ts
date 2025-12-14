@@ -16,20 +16,18 @@
  * Based on: ScmService (Java)
  */
 
-// Mock axios instances from getCertificateAuthority BEFORE imports
-jest.mock('../../helpers/getCertificateAuthority', () => ({
-  axiosInstanceNoCert: {
-    get: jest.fn(),
-  },
-  axiosInstance: {
-    get: jest.fn(),
-  },
+const mockResolveFile = jest.fn();
+
+// Mock ScmService so these tests are stable and don't depend on network/Kubernetes.
+jest.mock('../../services/ScmFileResolvers', () => ({
+  ScmService: jest.fn().mockImplementation(() => ({
+    resolveFile: mockResolveFile,
+  })),
 }));
 
 import Fastify, { FastifyInstance } from 'fastify';
 import { registerScmRoutes } from '../scmRoutes';
 import { authenticate, requireAuth } from '../../middleware/auth';
-import { axiosInstanceNoCert } from '../../helpers/getCertificateAuthority';
 
 describe('SCM Routes (Fastify)', () => {
   let app: FastifyInstance;
@@ -81,17 +79,7 @@ describe('SCM Routes (Fastify)', () => {
     });
 
     it('should return 404 when file not found without authentication', async () => {
-      // GitHub resolver disambiguates public vs private when it gets 404 without auth:
-      // 1) checks repo visibility via GitHub API (200 => public)
-      // 2) fetches raw file URL (404 => file missing)
-      (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
-        status: 200,
-        data: {},
-      });
-      (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
-        status: 404,
-        statusText: 'Not Found',
-      });
+      mockResolveFile.mockRejectedValueOnce(new Error('not found'));
 
       const response = await app.inject({
         method: 'GET',
@@ -104,11 +92,7 @@ describe('SCM Routes (Fastify)', () => {
     });
 
     it('should resolve file from valid URL with authentication', async () => {
-      // Mock axios for testing
-      (axiosInstanceNoCert.get as jest.Mock).mockResolvedValue({
-        status: 200,
-        data: 'file content here',
-      });
+      mockResolveFile.mockResolvedValueOnce('file content here');
 
       const response = await app.inject({
         method: 'GET',
@@ -124,16 +108,7 @@ describe('SCM Routes (Fastify)', () => {
     });
 
     it('should return 404 when file not found with authorization', async () => {
-      // The route does not pass the OIDC auth header to GitHub.
-      // It disambiguates 404 via GitHub API first, then fetches the raw file.
-      (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
-        status: 200,
-        data: {},
-      });
-      (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
-        status: 404,
-        statusText: 'Not Found',
-      });
+      mockResolveFile.mockRejectedValueOnce(new Error('404'));
 
       const response = await app.inject({
         method: 'GET',
@@ -149,7 +124,7 @@ describe('SCM Routes (Fastify)', () => {
     });
 
     it('should handle network errors gracefully', async () => {
-      (axiosInstanceNoCert.get as jest.Mock).mockRejectedValue(new Error('Network error'));
+      mockResolveFile.mockRejectedValueOnce(new Error('Network error'));
 
       const response = await app.inject({
         method: 'GET',

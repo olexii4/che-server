@@ -15,6 +15,12 @@
  *
  * Based on: OAuthAuthenticationService (Java)
  */
+jest.mock('../../services/PatLookupService', () => ({
+  PatLookupService: jest.fn().mockImplementation(() => ({
+    getPatForProvider: jest.fn().mockResolvedValue(null),
+  })),
+}));
+
 import Fastify, { FastifyInstance } from 'fastify';
 import { registerOAuthRoutes } from '../oauthRoutes';
 import { authenticate, requireAuth } from '../../middleware/auth';
@@ -103,9 +109,7 @@ describe('OAuth Routes (Fastify)', () => {
       expect(body.message).toContain('required');
     });
 
-    it('should return 404 when provider is not configured', async () => {
-      // Without Kubernetes Secrets, no providers are configured
-      // The service returns 404 when provider is not found
+    it('should return 401 when token is not found', async () => {
       const response = await app.inject({
         method: 'GET',
         url: '/oauth/token?oauth_provider=github',
@@ -114,10 +118,10 @@ describe('OAuth Routes (Fastify)', () => {
         },
       });
 
-      expect(response.statusCode).toBe(404);
+      expect(response.statusCode).toBe(401);
       const body = JSON.parse(response.body);
-      expect(body.error).toBe('Not Found');
-      expect(body.message).toContain('not found');
+      expect(body.error).toBe('Unauthorized');
+      expect(body.message).toContain('was not found');
     });
 
     it('should return 401 without authentication', async () => {
@@ -143,8 +147,7 @@ describe('OAuth Routes (Fastify)', () => {
       expect(response.statusCode).toBe(400);
     });
 
-    it('should return 404 when token not found', async () => {
-      // Attempt to delete a non-existent token
+    it('should return 204 even when token is not found (idempotent)', async () => {
       const response = await app.inject({
         method: 'DELETE',
         url: '/oauth/token?oauth_provider=github',
@@ -153,10 +156,7 @@ describe('OAuth Routes (Fastify)', () => {
         },
       });
 
-      expect(response.statusCode).toBe(404);
-      const body = JSON.parse(response.body);
-      expect(body.error).toBe('Not Found');
-      expect(body.message).toContain('OAuth token not found');
+      expect(response.statusCode).toBe(204);
     });
 
     it('should return 401 without authentication', async () => {

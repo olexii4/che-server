@@ -49,7 +49,7 @@ export async function registerFactoryRoutes(fastify: FastifyInstance): Promise<v
 - GitHub: https://github.com/eclipse-che/che-dashboard.git
 - GitLab: https://gitlab.com/user/project.git
 - Bitbucket: https://bitbucket.org/workspace/repo.git`,
-        security: [{ BearerAuth: [] }, { BasicAuth: [] }],
+        security: [{ BearerAuth: [] }],
         body: {
           type: 'object',
           required: ['url'],
@@ -183,7 +183,7 @@ export async function registerFactoryRoutes(fastify: FastifyInstance): Promise<v
         tags: ['factory'],
         summary: 'Refresh factory OAuth token',
         description: 'Validate the factory related OAuth token and update/create it if needed',
-        security: [{ BearerAuth: [] }, { BasicAuth: [] }],
+        security: [{ BearerAuth: [] }],
         querystring: {
           type: 'object',
           required: ['url'],

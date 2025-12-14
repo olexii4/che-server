@@ -40,7 +40,7 @@ export async function registerNamespaceRoutes(fastify: FastifyInstance): Promise
         tags: ['kubernetes-namespace'],
         summary: 'List user Kubernetes namespaces',
         description: 'Get k8s namespaces for the current user. Returns only user-owned namespaces.',
-        security: [{ BearerAuth: [] }, { BasicAuth: [] }],
+        security: [{ BearerAuth: [] }],
         response: {
           200: {
             description: 'Successful response - List of user namespaces',
@@ -138,7 +138,7 @@ export async function registerNamespaceRoutes(fastify: FastifyInstance): Promise
         tags: ['kubernetes-namespace'],
         summary: 'Provision Kubernetes namespace',
         description: 'Provision k8s namespace where user is able to create workspaces',
-        security: [{ BearerAuth: [] }, { BasicAuth: [] }],
+        security: [{ BearerAuth: [] }],
         response: {
           200: {
             description: 'Namespace provisioned successfully',

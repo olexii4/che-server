@@ -86,7 +86,7 @@ Authorization: Bearer user123:johndoe
 **Example:**
 ```http
 GET /api/kubernetes/namespace
-Authorization: Basic am9obmRvZTp1c2VyMTIz
+Authorization: Bearer user123:johndoe
 ```
 
 Base64 decodes to: `johndoe:user123`
