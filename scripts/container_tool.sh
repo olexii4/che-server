@@ -14,6 +14,11 @@
 #   1. As standalone script: ./container_tool.sh build ...
 #   2. Source in other scripts: source container_tool.sh (sets $container_engine)
 
+# If this file is sourced, do NOT execute the CLI behavior (case "$1" ...).
+# Just detect the engine and export $container_engine for the caller.
+is_sourced=0
+( return 0 2>/dev/null ) && is_sourced=1
+
 # Function to check if a command is available
 command_exists() {
     command -v "$1" >/dev/null 2>&1
@@ -21,7 +26,7 @@ command_exists() {
 
 # Detect container engine
 detect_container_engine() {
-    local engine=""
+    engine=""
 
     # Check for Podman
     if command_exists "podman"; then
@@ -57,9 +62,14 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+if [ "$is_sourced" -eq 1 ]; then
+    export container_engine
+    return 0 2>/dev/null || exit 0
+fi
+
 # Run command using Docker or Podman whichever is available
 container_tool() {
-    local command=$1
+    command=$1
     shift
 
     echo "Container engine: $container_engine" >&2
