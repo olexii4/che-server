@@ -171,11 +171,11 @@ export IMAGE_TAG=next
 ### Manual Build
 
 ```bash
-# Build Docker image
-docker build -f build/dockerfiles/Dockerfile -t docker.io/olexii4dockerid/che-server:next .
+# Build image (Docker or Podman via container_tool.sh)
+./scripts/container_tool.sh build -f build/dockerfiles/Dockerfile -t docker.io/olexii4dockerid/che-server:next .
 
-# Run locally
-docker run -p 8080:8080 docker.io/olexii4dockerid/che-server:next
+# Run locally (Docker or Podman via container_tool.sh)
+./scripts/container_tool.sh run -p 8080:8080 docker.io/olexii4dockerid/che-server:next
 ```
 
 **📖 For detailed build instructions, see [build/README.md](build/README.md)**

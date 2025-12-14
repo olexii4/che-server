@@ -1,26 +1,25 @@
-# Docker/Podman Build Scripts
+# Container Build Scripts
 
-This directory contains scripts and configuration for building the Eclipse Che Server (TypeScript) container image with support for both Docker and Podman.
+This directory contains scripts and configuration for building the Eclipse Che Server (TypeScript) container image.
 
 ## Files
 
 - `build.sh` - Main build script with multiplatform support (Docker + Podman)
 - `dockerfiles/Dockerfile` - Container image definition
 - `dockerfiles/entrypoint.sh` - Container entrypoint script
-- `dockerfiles/docker-compose.yml` - Docker Compose configuration for local development
+- `dockerfiles/docker-compose.yml` - Compose configuration for local development
 - `../scripts/container_tool.sh` - Container engine detection utility
 
 ## Container Engine Support
 
-The build script automatically detects and uses the available container engine:
-- 🐋 **Docker** - Uses Docker Buildx for multiplatform builds
-- 🦭 **Podman** - Uses native Podman manifest support
+This repo uses `./scripts/container_tool.sh` to auto-detect and use **Docker or Podman** for basic commands.
+Multiplatform builds are handled by `build/build.sh` / `run/build-multiarch.sh` depending on your environment.
 
 ## Building the Image
 
 ### Local Build (Single Platform)
 
-Build for your current platform and load into local Docker:
+Build for your current platform and load into your local container engine:
 
 ```bash
 ./build/build.sh olexii4dockerid/che-server next
@@ -65,15 +64,8 @@ Build for multiple platforms (linux/amd64, linux/arm64):
 
 ## Requirements
 
-### Docker
-- Docker with buildx support (Docker 19.03+)
-- For multiplatform builds: Access to a container registry
-
-### Podman
-- Podman 3.0+ with manifest support
-- For multiplatform builds: Access to a container registry
-
-**Note**: The build script automatically detects which container engine is available and uses it.
+- **Docker** or **Podman** (running)
+- For multiplatform builds: access to a container registry
 
 ## Supported Platforms
 
@@ -82,35 +74,33 @@ Build for multiple platforms (linux/amd64, linux/arm64):
 
 ## Container Engine Setup
 
-### Docker Buildx
+### Docker Buildx (when using Docker)
 
 The script automatically creates a `multiplatform-builder` instance if it doesn't exist. You can also create it manually:
+
+Use the helper scripts; if you need to set up buildx manually:
 
 ```bash
 docker buildx create --name multiplatform-builder --use
 docker buildx inspect --bootstrap
 ```
 
-### Podman
+### Podman (when using Podman)
 
 Podman supports multiplatform builds natively using manifests. No additional setup required:
 
-```bash
-# Check Podman version (3.0+ recommended)
-podman --version
+Check your version:
 
-# Check manifest support
-podman manifest --help
+```bash
+podman --version
 ```
 
 ## Troubleshooting
 
 ### Error: Neither Docker nor Podman is installed or running
 
-Install Docker or Podman:
-- **Docker Desktop**: https://www.docker.com/products/docker-desktop
-- **Docker Engine**: https://docs.docker.com/engine/install/
-- **Podman**: https://podman.io/getting-started/installation
+`./scripts/container_tool.sh` prints this when it can't find a running container engine.
+Install and start Docker or Podman.
 
 ### Error: docker buildx is not available
 
@@ -124,7 +114,6 @@ Ensure you have Podman 3.0+:
 
 ```bash
 podman --version
-# Should be 3.0.0 or higher
 ```
 
 Update Podman if needed:

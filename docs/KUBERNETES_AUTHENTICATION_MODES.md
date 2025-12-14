@@ -246,7 +246,7 @@ curl -H "Authorization: Bearer ${TOKEN}" \
 
 ```bash
 # Build and deploy
-docker build -t che-server:test .
+./scripts/container_tool.sh build -t che-server:test .
 kubectl apply -f deployment.yaml
 
 # Test from within cluster
