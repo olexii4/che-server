@@ -81,10 +81,14 @@ describe('SCM Routes (Fastify)', () => {
     });
 
     it('should return 404 when file not found without authentication', async () => {
-      // Mock axios to return 404
-      // For GitHub raw URLs, 404 means file doesn't exist (public repo)
-      // We don't assume private repo and prompt for auth
-      (axiosInstanceNoCert.get as jest.Mock).mockResolvedValue({
+      // GitHub resolver disambiguates public vs private when it gets 404 without auth:
+      // 1) checks repo visibility via GitHub API (200 => public)
+      // 2) fetches raw file URL (404 => file missing)
+      (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
+        status: 200,
+        data: {},
+      });
+      (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
         status: 404,
         statusText: 'Not Found',
       });
@@ -120,7 +124,13 @@ describe('SCM Routes (Fastify)', () => {
     });
 
     it('should return 404 when file not found with authorization', async () => {
-      (axiosInstanceNoCert.get as jest.Mock).mockResolvedValue({
+      // The route does not pass the OIDC auth header to GitHub.
+      // It disambiguates 404 via GitHub API first, then fetches the raw file.
+      (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
+        status: 200,
+        data: {},
+      });
+      (axiosInstanceNoCert.get as jest.Mock).mockResolvedValueOnce({
         status: 404,
         statusText: 'Not Found',
       });

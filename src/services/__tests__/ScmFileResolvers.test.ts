@@ -25,10 +25,19 @@ import { UnauthorizedException } from '../../models/UnauthorizedException';
 jest.mock('../../helpers/getCertificateAuthority', () => ({
   axiosInstanceNoCert: {
     get: jest.fn(),
+    request: jest.fn(),
   },
   axiosInstance: {
     get: jest.fn(),
+    request: jest.fn(),
   },
+}));
+
+// Prevent tests from exiting when not running in a Kubernetes pod.
+jest.mock('../../helpers/getServiceAccountToken', () => ({
+  getServiceAccountToken: () => '',
+  isLocalRun: () => true,
+  SERVICE_ACCOUNT_TOKEN_PATH: '/run/secrets/kubernetes.io/serviceaccount/token',
 }));
 
 // Prevent tests from exiting when not running in a Kubernetes pod.

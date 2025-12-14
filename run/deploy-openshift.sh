@@ -217,47 +217,26 @@ build_and_push_image() {
     print_info "Image pushed: ${CHE_SERVER_IMAGE}"
 }
 
-# Create cr-patch.yaml with custom image
-create_cr_patch() {
-    local patch_file="${PROJECT_ROOT}/cr-patch-generated.yaml"
-    
-    cat > "$patch_file" << EOF
-# Auto-generated CheCluster patch for custom che-server image
-# Generated at: $(date -Iseconds)
-kind: CheCluster
-apiVersion: org.eclipse.che/v2
-spec:
-  components:
-    cheServer:
-      deployment:
-        containers:
-          - image: '${CHE_SERVER_IMAGE}'
-            imagePullPolicy: Always
-            name: che-server
-EOF
+patch_checluster_image() {
+    print_info "Patching CheCluster che-server image to: ${CHE_SERVER_IMAGE}"
 
-    echo "$patch_file"
+    kubectl patch -n "${CHE_NAMESPACE}" "checluster/eclipse-che" --type=json \
+      -p="[{\"op\":\"replace\",\"path\":\"/spec/components/cheServer/deployment\",\"value\":{\"containers\":[{\"image\":\"${CHE_SERVER_IMAGE}\",\"imagePullPolicy\":\"Always\",\"name\":\"che-server\"}]}}]"
 }
 
 # Deploy Eclipse Che using chectl
 deploy_che() {
     print_info "Deploying Eclipse Che on OpenShift..."
-    
-    local patch_file
-    patch_file=$(create_cr_patch)
-    
-    print_info "Using CR patch file: ${patch_file}"
-    cat "$patch_file"
-    echo ""
-    
+
     # Deploy using chectl
     # https://github.com/che-incubator/chectl
     chectl server:deploy \
         --platform=openshift \
-        --che-operator-cr-patch-yaml="$patch_file" \
         --chenamespace="$CHE_NAMESPACE" \
         --batch \
         --telemetry=off
+
+    patch_checluster_image
     
     print_info "Eclipse Che deployed successfully!"
     

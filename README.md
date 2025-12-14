@@ -182,23 +182,25 @@ docker run -p 8080:8080 docker.io/olexii4dockerid/che-server:next
 
 ## Deploying to Eclipse Che
 
-### Using cr-patch.yaml
+### Patch che-server image (recommended)
 
-The `cr-patch.yaml` file patches the CheCluster Custom Resource to use this TypeScript che-server:
+Use the helper script (no templating issues, works with any `chectl` version):
 
 ```bash
-# Deploy new Eclipse Che instance (OpenShift example)
-chectl server:deploy --platform=openshift --batch --che-operator-cr-patch-yaml=$(PWD)/cr-patch.yaml
-
-# Update existing instance
-chectl server:update --che-operator-cr-patch-yaml=$(PWD)/cr-patch.yaml
+./scripts/patch-che-server-image.sh
 ```
 
-### Direct kubectl patch
+Or specify an explicit image:
+
+```bash
+CHE_SERVER_IMAGE=docker.io/olexii4dockerid/che-server:next ./scripts/patch-che-server-image.sh
+```
+
+### Direct kubectl patch (one-liner)
 
 ```bash
 kubectl patch -n eclipse-che "checluster/eclipse-che" --type=json \
-  -p='[{"op": "replace", "path": "/spec/components/cheServer/deployment", "value": {containers: [{image: "docker.io/olexii4dockerid/che-server:next", imagePullPolicy: "Always", name: "che-server"}]}}]'
+  -p='[{"op":"replace","path":"/spec/components/cheServer/deployment","value":{"containers":[{"image":"docker.io/olexii4dockerid/che-server:next","imagePullPolicy":"Always","name":"che-server"}]}}]'
 ```
 
 ### OpenShift helper script
@@ -257,7 +259,6 @@ che-server/
 │   └── build.sh          # Multiplatform build script
 ├── docs/                 # Implementation documentation
 ├── scripts/              # Utility scripts
-├── cr-patch.yaml         # CheCluster patch for deployment
 └── package.json
 ```
 
@@ -304,7 +305,7 @@ che-server/
 
 ### Docker & Deployment
 - **[build/README.md](build/README.md)** - Docker build guide
-- **[cr-patch.yaml](cr-patch.yaml)** - CheCluster patch file
+- **`scripts/patch-che-server-image.sh`** - Patch CheCluster che-server image (recommended)
 
 ## License
 

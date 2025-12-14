@@ -187,10 +187,10 @@ After creating or updating OAuth secrets, restart the Che Server to load the new
 kubectl rollout restart deployment/che -n eclipse-che
 ```
 
-Or use `chectl`:
+If you updated the `che-server` image, patch the CheCluster (recommended):
 
 ```bash
-chectl server:update --che-operator-cr-patch-yaml=$(PWD)/cr-patch.yaml
+CHE_SERVER_IMAGE=docker.io/olexii4dockerid/che-server:next ./scripts/patch-che-server-image.sh
 ```
 
 ## Testing OAuth Configuration

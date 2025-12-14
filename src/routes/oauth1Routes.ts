@@ -11,12 +11,15 @@
  */
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import crypto from 'crypto';
 import {
   getOAuth1Service,
   OAuth1AuthenticationException,
   UserDeniedOAuthAuthenticationException,
   getRedirectAfterLoginUrl,
 } from '../services/OAuth1Service';
+import { getServiceAccountKubeConfig } from '../helpers/getKubernetesClient';
+import { PersonalAccessTokenService } from '../services/PersonalAccessTokenService';
 
 function queryMapFromState(state: string): Map<string, string> {
   // Java uses UrlUtils.getQueryParametersFromState(getState(requestUrl)).
@@ -54,7 +57,9 @@ export async function registerOAuth1Routes(fastify: FastifyInstance): Promise<vo
         return reply.code(400).send({ error: 'Bad Request', message: 'Provider name required' });
       }
       if (!redirectAfterLogin) {
-        return reply.code(400).send({ error: 'Bad Request', message: 'Redirect after login required' });
+        return reply
+          .code(400)
+          .send({ error: 'Bad Request', message: 'Redirect after login required' });
       }
       if (!request.subject?.id) {
         return reply.code(401).send({ error: 'Unauthorized', message: 'Authentication required' });
@@ -82,7 +87,9 @@ export async function registerOAuth1Routes(fastify: FastifyInstance): Promise<vo
         );
         return reply.redirect(307, authUrl);
       } catch (e: any) {
-        return reply.code(400).send({ error: 'Bad Request', message: e?.message || 'OAuth1 error' });
+        return reply
+          .code(400)
+          .send({ error: 'Bad Request', message: e?.message || 'OAuth1 error' });
       }
     },
   );
@@ -117,7 +124,53 @@ export async function registerOAuth1Routes(fastify: FastifyInstance): Promise<vo
       }
 
       try {
-        await authenticator.callback(fullUrl);
+        const userId = await authenticator.callback(fullUrl);
+
+        // Java factory flow uses OAuth1 to create a Bitbucket Server Personal Access Token (PAT)
+        // to be used for further SCM operations. In Node, we store this PAT as a Kubernetes Secret
+        // in the user's namespace (best-effort, same pattern as OAuth2 callback).
+        if (providerName === 'bitbucket-server' && request.subject?.userName) {
+          try {
+            const apiHostHint =
+              process.env.CHE_HOST ||
+              process.env.CHE_API ||
+              process.env.CHE_API_ENDPOINT ||
+              request.headers.host ||
+              'che';
+            const hostHash = crypto
+              .createHash('sha1')
+              .update(String(apiHostHint))
+              .digest('hex')
+              .slice(0, 8);
+            const displayName = `che-token-${userId}-${hostHash}`;
+
+            const patValue = await authenticator.createOrRefreshPersonalAccessToken(
+              userId,
+              displayName,
+            );
+            const namespace = `${request.subject.userName}-che`;
+
+            const kubeConfig = getServiceAccountKubeConfig();
+            const patService = new PersonalAccessTokenService(kubeConfig);
+
+            const tokenName = Math.random().toString(36).substring(2, 7);
+            const tokenDataBase64 = Buffer.from(patValue).toString('base64');
+
+            await patService.create(namespace, {
+              tokenName,
+              cheUserId: userId,
+              gitProvider: 'bitbucket-server' as any,
+              gitProviderEndpoint: authenticator.getEndpointUrl(),
+              isOauth: true,
+              tokenData: tokenDataBase64,
+            });
+          } catch (patErr: any) {
+            fastify.log.error(
+              { error: patErr?.message, provider: providerName },
+              'OAuth1 callback: failed to create/store Bitbucket Server PAT (continuing)',
+            );
+          }
+        }
         return reply.redirect(307, redirectAfterLogin);
       } catch (e: any) {
         if (e instanceof UserDeniedOAuthAuthenticationException) {
@@ -176,10 +229,10 @@ export async function registerOAuth1Routes(fastify: FastifyInstance): Promise<vo
         );
         return reply.code(200).send(header);
       } catch (e: any) {
-        return reply.code(401).send({ error: 'Unauthorized', message: e?.message || 'OAuth1 error' });
+        return reply
+          .code(401)
+          .send({ error: 'Unauthorized', message: e?.message || 'OAuth1 error' });
       }
     },
   );
 }
-
-

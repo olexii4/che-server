@@ -51,6 +51,12 @@ describe('getServiceAccountToken', () => {
   });
 
   describe('getServiceAccountToken', () => {
+    beforeEach(() => {
+      // Force non-test mode so we can exercise real behavior.
+      // Jest sets NODE_ENV=test by default.
+      process.env.NODE_ENV = 'development';
+    });
+
     describe('in local run mode', () => {
       beforeEach(() => {
         process.env.LOCAL_RUN = 'true';

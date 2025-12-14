@@ -12,7 +12,7 @@
 
 import { readFileSync } from 'fs';
 import crypto from 'crypto';
-import { axiosInstanceNoCert } from '../helpers/getCertificateAuthority';
+import { axiosInstance, axiosInstanceNoCert } from '../helpers/getCertificateAuthority';
 import { logger } from '../utils/logger';
 
 export class OAuth1AuthenticationException extends Error {}
@@ -36,8 +36,10 @@ function epochSeconds(): string {
 
 function percentEncode(input: string): string {
   // OAuth 1.0 percent-encoding is close to encodeURIComponent, but we keep it explicit.
-  return encodeURIComponent(input)
-    .replace(/[!'()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  return encodeURIComponent(input).replace(
+    /[!'()*]/g,
+    c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
 }
 
 function normalizeBaseUrl(requestUrl: string): string {
@@ -54,7 +56,11 @@ function normalizeParameters(params: Record<string, string>): string {
     .join('&');
 }
 
-function buildSignatureBaseString(method: string, requestUrl: string, params: Record<string, string>) {
+function buildSignatureBaseString(
+  method: string,
+  requestUrl: string,
+  params: Record<string, string>,
+): string {
   const baseUrl = normalizeBaseUrl(requestUrl);
   const normalizedParams = normalizeParameters(params);
   return `${method.toUpperCase()}&${percentEncode(baseUrl)}&${percentEncode(normalizedParams)}`;
@@ -186,7 +192,9 @@ export class BitbucketServerOAuth1Authenticator {
     signatureMethod: string | undefined,
     currentUserId: string,
   ): Promise<string> {
-    const query = requestUrl.search.startsWith('?') ? requestUrl.search.substring(1) : requestUrl.search;
+    const query = requestUrl.search.startsWith('?')
+      ? requestUrl.search.substring(1)
+      : requestUrl.search;
     const queryParams = new URLSearchParams(query);
     const providedUserId = queryParams.get('userId');
     if (providedUserId && providedUserId !== currentUserId) {
@@ -202,7 +210,8 @@ export class BitbucketServerOAuth1Authenticator {
     callbackUrl.search = queryParams.toString();
 
     const httpMethod = requestMethod?.toLowerCase() === 'post' ? 'POST' : 'GET';
-    const sigMethod: OAuth1SignatureMethod = signatureMethod?.toLowerCase() === 'rsa' ? 'rsa' : 'hmac';
+    const sigMethod: OAuth1SignatureMethod =
+      signatureMethod?.toLowerCase() === 'rsa' ? 'rsa' : 'hmac';
 
     const oauthParams: Record<string, string> = {
       oauth_callback: callbackUrl.toString(),
@@ -212,7 +221,12 @@ export class BitbucketServerOAuth1Authenticator {
       oauth_timestamp: epochSeconds(),
       oauth_version: '1.0',
     };
-    oauthParams.oauth_signature = this.sign(sigMethod, httpMethod, this.requestTokenUri, oauthParams);
+    oauthParams.oauth_signature = this.sign(
+      sigMethod,
+      httpMethod,
+      this.requestTokenUri,
+      oauthParams,
+    );
 
     const headers = { Authorization: oauthHeader(oauthParams) };
     const resp = await axiosInstanceNoCert.request({
@@ -246,7 +260,9 @@ export class BitbucketServerOAuth1Authenticator {
 
     if (!oauthToken) throw new OAuth1AuthenticationException('Missing oauth_token parameter');
     if (!oauthVerifier) throw new OAuth1AuthenticationException('Missing oauth_verifier parameter');
-    if (oauthVerifier === 'denied') throw new UserDeniedOAuthAuthenticationException('Authorization denied');
+    if (oauthVerifier === 'denied') {
+      throw new UserDeniedOAuthAuthenticationException('Authorization denied');
+    }
 
     const stateParams = new URLSearchParams(state);
     const userId = stateParams.get('userId') ?? '';
@@ -254,7 +270,8 @@ export class BitbucketServerOAuth1Authenticator {
     const signatureMethod = stateParams.get('signature_method') ?? undefined;
 
     const httpMethod = requestMethod?.toLowerCase() === 'post' ? 'POST' : 'GET';
-    const sigMethod: OAuth1SignatureMethod = signatureMethod?.toLowerCase() === 'rsa' ? 'rsa' : 'hmac';
+    const sigMethod: OAuth1SignatureMethod =
+      signatureMethod?.toLowerCase() === 'rsa' ? 'rsa' : 'hmac';
 
     const oauthParams: Record<string, string> = {
       oauth_consumer_key: this.consumerKey,
@@ -267,7 +284,13 @@ export class BitbucketServerOAuth1Authenticator {
     };
 
     const tempSecret = this.tempTokenSecrets.get(oauthToken);
-    oauthParams.oauth_signature = this.sign(sigMethod, httpMethod, this.accessTokenUri, oauthParams, tempSecret);
+    oauthParams.oauth_signature = this.sign(
+      sigMethod,
+      httpMethod,
+      this.accessTokenUri,
+      oauthParams,
+      tempSecret,
+    );
 
     const headers = { Authorization: oauthHeader(oauthParams) };
     const resp = await axiosInstanceNoCert.request({
@@ -311,8 +334,155 @@ export class BitbucketServerOAuth1Authenticator {
       oauth_token: creds.token,
       oauth_version: '1.0',
     };
-    oauthParams.oauth_signature = this.sign('rsa', requestMethod, requestUrl, oauthParams, creds.tokenSecret);
+    oauthParams.oauth_signature = this.sign(
+      'rsa',
+      requestMethod,
+      requestUrl,
+      oauthParams,
+      creds.tokenSecret,
+    );
     return oauthHeader(oauthParams);
+  }
+
+  /**
+   * Create/refresh a Bitbucket Server Personal Access Token using OAuth1-signed requests.
+   *
+   * Java reference:
+   * - HttpBitbucketServerApiClient#getUser(): uses /rest/api/1.0/application-properties and reads x-ausername header
+   * - BitbucketServerPersonalAccessTokenFetcher: deletes existing "che-token-<userId>-<host>" tokens and creates a new one
+   */
+  async createOrRefreshPersonalAccessToken(
+    userId: string,
+    tokenDisplayName: string,
+    permissions: string[] = ['PROJECT_WRITE', 'REPO_WRITE'],
+  ): Promise<string> {
+    const base = this.bitbucketEndpoint.endsWith('/')
+      ? this.bitbucketEndpoint.slice(0, -1)
+      : this.bitbucketEndpoint;
+
+    // 1) Get authenticated username from response header
+    const appPropsUrl = `${base}/rest/api/1.0/application-properties`;
+    const appPropsAuth = this.computeAuthorizationHeader(userId, 'GET', appPropsUrl);
+    const appPropsResp = await this.axiosGetWithFallback(appPropsUrl, {
+      Authorization: appPropsAuth,
+    });
+    const rawUsernameHeader =
+      (appPropsResp.headers?.['x-ausername'] as string | undefined) ||
+      (appPropsResp.headers?.['X-AUSERNAME'] as string | undefined);
+    if (!rawUsernameHeader) {
+      throw new OAuth1AuthenticationException('Missing x-ausername header (not authenticated)');
+    }
+    const username = decodeURIComponent(rawUsernameHeader);
+
+    // 2) Resolve user slug
+    const usersUrl = `${base}/rest/api/1.0/users?start=0&limit=25&filter=${encodeURIComponent(username)}`;
+    const usersAuth = this.computeAuthorizationHeader(userId, 'GET', usersUrl);
+    const usersResp = await this.axiosGetWithFallback(usersUrl, { Authorization: usersAuth });
+    if (usersResp.status !== 200) {
+      throw new OAuth1AuthenticationException(`Failed to list users: HTTP ${usersResp.status}`);
+    }
+    const users = (usersResp.data?.values || []) as Array<{ name?: string; slug?: string }>;
+    const matched = users.find(u => u?.name === username);
+    if (!matched?.slug) {
+      throw new OAuth1AuthenticationException(`User '${username}' not found in Bitbucket`);
+    }
+    const slug = matched.slug;
+
+    // 3) Delete existing tokens with the same display name
+    const listTokensUrl = `${base}/rest/access-tokens/1.0/users/${encodeURIComponent(slug)}?start=0&limit=100`;
+    const listAuth = this.computeAuthorizationHeader(userId, 'GET', listTokensUrl);
+    const tokensResp = await this.axiosGetWithFallback(listTokensUrl, { Authorization: listAuth });
+    if (tokensResp.status === 200 && tokensResp.data?.values) {
+      const tokens = tokensResp.data.values as Array<{ id?: number | string; name?: string }>;
+      const toDelete = tokens.filter(t => t?.name === tokenDisplayName && t?.id !== undefined);
+      for (const t of toDelete) {
+        const delUrl = `${base}/rest/access-tokens/1.0/users/${encodeURIComponent(slug)}/${t.id}`;
+        const delAuth = this.computeAuthorizationHeader(userId, 'DELETE', delUrl);
+        const delResp = await this.axiosRequestWithFallback('DELETE', delUrl, delAuth);
+        if (delResp.status !== 200 && delResp.status !== 204 && delResp.status !== 404) {
+          logger.warn(
+            { status: delResp.status, tokenId: t.id },
+            'BitbucketServerOAuth1Authenticator: failed to delete existing token',
+          );
+        }
+      }
+    }
+
+    // 4) Create new token
+    const createUrl = `${base}/rest/access-tokens/1.0/users/${encodeURIComponent(slug)}`;
+    const createAuth = this.computeAuthorizationHeader(userId, 'PUT', createUrl);
+    const createResp = await this.axiosPutJsonWithFallback(createUrl, createAuth, {
+      name: tokenDisplayName,
+      permissions,
+      expiryDays: 90,
+    });
+    if (createResp.status !== 200) {
+      throw new OAuth1AuthenticationException(`Failed to create PAT: HTTP ${createResp.status}`);
+    }
+    const tokenValue = createResp.data?.token as string | undefined;
+    if (!isNonEmptyString(tokenValue)) {
+      throw new OAuth1AuthenticationException('Missing token in PAT create response');
+    }
+    return tokenValue;
+  }
+
+  private async axiosGetWithFallback(
+    url: string,
+    headers: Record<string, string>,
+  ): Promise<{ status: number; data: any; headers: any }> {
+    const config = { headers, validateStatus: () => true };
+    try {
+      const resp = await axiosInstanceNoCert.get(url, config);
+      return { status: resp.status, data: resp.data, headers: resp.headers };
+    } catch {
+      const resp = await axiosInstance.get(url, config);
+      return { status: resp.status, data: resp.data, headers: resp.headers };
+    }
+  }
+
+  private async axiosRequestWithFallback(
+    method: 'DELETE',
+    url: string,
+    authorization: string,
+  ): Promise<{ status: number; data: any }> {
+    const config = {
+      method,
+      url,
+      headers: { Authorization: authorization, Accept: 'application/json' },
+      validateStatus: () => true,
+    };
+    try {
+      const resp = await axiosInstanceNoCert.request(config as any);
+      return { status: resp.status, data: resp.data };
+    } catch {
+      const resp = await axiosInstance.request(config as any);
+      return { status: resp.status, data: resp.data };
+    }
+  }
+
+  private async axiosPutJsonWithFallback(
+    url: string,
+    authorization: string,
+    body: any,
+  ): Promise<{ status: number; data: any }> {
+    const config = {
+      method: 'PUT',
+      url,
+      headers: {
+        Authorization: authorization,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      data: body,
+      validateStatus: () => true,
+    };
+    try {
+      const resp = await axiosInstanceNoCert.request(config as any);
+      return { status: resp.status, data: resp.data };
+    } catch {
+      const resp = await axiosInstance.request(config as any);
+      return { status: resp.status, data: resp.data };
+    }
   }
 }
 
@@ -338,7 +508,11 @@ export class OAuth1Service {
       process.env.CHE_API_ENDPOINT ||
       `http://localhost:${process.env.PORT || 8080}/api`;
 
-    if (!isNonEmptyString(consumerKeyPath) || !isNonEmptyString(privateKeyPath) || !isNonEmptyString(bitbucketEndpoint)) {
+    if (
+      !isNonEmptyString(consumerKeyPath) ||
+      !isNonEmptyString(privateKeyPath) ||
+      !isNonEmptyString(bitbucketEndpoint)
+    ) {
       logger.info(
         {
           hasConsumerKeyPath: isNonEmptyString(consumerKeyPath),
@@ -367,7 +541,10 @@ export class OAuth1Service {
         'OAuth1Service: Bitbucket Server OAuth1 authenticator is configured',
       );
     } catch (e: any) {
-      logger.warn({ err: e?.message }, 'OAuth1Service: Failed to initialize Bitbucket Server OAuth1 authenticator');
+      logger.warn(
+        { err: e?.message },
+        'OAuth1Service: Failed to initialize Bitbucket Server OAuth1 authenticator',
+      );
     }
   }
 
@@ -380,7 +557,7 @@ export class OAuth1Service {
 }
 
 function ensureApiBase(apiEndpoint: string): string {
-  let base = apiEndpoint.endsWith('/') ? apiEndpoint.slice(0, -1) : apiEndpoint;
+  const base = apiEndpoint.endsWith('/') ? apiEndpoint.slice(0, -1) : apiEndpoint;
   if (base.endsWith('/api')) {
     return base;
   }
@@ -393,5 +570,3 @@ oauth1ServiceSingleton.initialize();
 export function getOAuth1Service(): OAuth1Service {
   return oauth1ServiceSingleton;
 }
-
-

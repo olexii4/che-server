@@ -29,6 +29,12 @@ export const SERVICE_ACCOUNT_TOKEN_PATH = '/run/secrets/kubernetes.io/serviceacc
  * https://github.com/eclipse-che/che-dashboard/blob/main/packages/dashboard-backend/src/routes/api/helpers/getServiceAccountToken.ts
  */
 export function getServiceAccountToken(): string {
+  // Tests should never hard-exit the process.
+  // Many unit tests run outside Kubernetes and don't mount the service account token file.
+  if (process.env.NODE_ENV === 'test') {
+    return '';
+  }
+
   const isLocalRun = process.env.LOCAL_RUN === 'true';
 
   if (isLocalRun) {
