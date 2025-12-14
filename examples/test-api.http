@@ -21,6 +21,9 @@
 @username = johndoe
 @userid = user123
 @bearer = {{userid}}:{{username}}
+### For real OpenShift user token testing: paste `oc whoami -t` output into a variable and use:
+###   Authorization: Bearer {{realToken}}
+### (Command substitution $(...) is not supported in .http files.)
 
 ### Provision Namespace (Bearer Token)
 POST {{baseUrl}}/kubernetes/namespace/provision

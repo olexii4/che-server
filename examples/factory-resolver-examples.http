@@ -13,6 +13,12 @@
 ###
 
 @baseUrl = http://localhost:8080/api
+### Token for Authorization header.
+### Recommended for local testing: use che-server "test Bearer" format: <userid>:<username>
+###   Example: user123:johndoe
+###
+### If you want to test with a real OpenShift user token, run `oc whoami -t` in your shell and
+### paste the resulting token value here (command substitution like $(...) is not supported in .http files).
 @token = user123:johndoe
 
 ### Example 1: GitHub Repository URL (NEW - Now Works!)
