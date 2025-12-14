@@ -24,6 +24,31 @@ set -euo pipefail
 API_URL="${API_URL:-http://localhost:8080/api}"
 USERNAME="${USERNAME:-johndoe}"
 USERID="${USERID:-user123}"
+USE_OC_TOKEN="${USE_OC_TOKEN:-false}"
+
+# Optional: auto-load a real cluster token for Kubernetes operations in LOCAL_RUN mode.
+# This sets USER_TOKEN (preferred) so che-server can talk to the cluster API.
+# It does NOT replace the request "test bearer" identity (user123:johndoe) unless you also set REAL_BEARER_TOKEN.
+if [[ "${USE_OC_TOKEN}" == "true" && -z "${USER_TOKEN:-}" ]]; then
+  if command -v oc >/dev/null 2>&1; then
+    if oc whoami -t >/dev/null 2>&1; then
+      export USER_TOKEN="$(oc whoami -t)"
+      echo "[INFO] USER_TOKEN set from 'oc whoami -t' (length: ${#USER_TOKEN})"
+      echo ""
+    else
+      echo "[WARN] USE_OC_TOKEN=true but 'oc whoami -t' failed (not logged in?)"
+      echo ""
+    fi
+  else
+    echo "[WARN] USE_OC_TOKEN=true but 'oc' command not found"
+    echo ""
+  fi
+fi
+
+# Request authentication header:
+# - default: che-server "test bearer" format (stable user identity for namespace naming)
+# - optional: set REAL_BEARER_TOKEN to use an actual token for Authorization header
+AUTH_HEADER_VALUE="${REAL_BEARER_TOKEN:-${USERID}:${USERNAME}}"
 
 echo "Testing che-server API at: ${API_URL}"
 echo "================================================"
@@ -45,9 +70,9 @@ echo ""
 # Test 1: Provision Namespace (Bearer token - test format)
 echo -e "${BLUE}Test 1: Provision Namespace (Bearer Token)${NC}"
 echo "POST $API_URL/kubernetes/namespace/provision"
-echo "Authorization: Bearer $USERID:$USERNAME"
+echo "Authorization: Bearer ${AUTH_HEADER_VALUE}"
 RESPONSE=$(curl -s -X POST $API_URL/kubernetes/namespace/provision \
-  -H "Authorization: Bearer $USERID:$USERNAME" \
+  -H "Authorization: Bearer ${AUTH_HEADER_VALUE}" \
   -H "Content-Type: application/json")
 echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
 echo ""
@@ -55,9 +80,9 @@ echo ""
 # Test 3: List Namespaces
 echo -e "${BLUE}Test 3: List Namespaces${NC}"
 echo "GET $API_URL/kubernetes/namespace"
-echo "Authorization: Bearer $USERID:$USERNAME"
+echo "Authorization: Bearer ${AUTH_HEADER_VALUE}"
 RESPONSE=$(curl -s $API_URL/kubernetes/namespace \
-  -H "Authorization: Bearer $USERID:$USERNAME")
+  -H "Authorization: Bearer ${AUTH_HEADER_VALUE}")
 echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
 echo ""
 
@@ -82,9 +107,9 @@ echo ""
 # Test 6: Resolve Factory
 echo -e "${BLUE}Test 6: Resolve Factory from URL${NC}"
 echo "POST $API_URL/factory/resolver"
-echo "Authorization: Bearer $USERID:$USERNAME"
+echo "Authorization: Bearer ${AUTH_HEADER_VALUE}"
 RESPONSE=$(curl -s -X POST $API_URL/factory/resolver \
-  -H "Authorization: Bearer $USERID:$USERNAME" \
+  -H "Authorization: Bearer ${AUTH_HEADER_VALUE}" \
   -H "Content-Type: application/json" \
   -d '{"url":"https://raw.githubusercontent.com/eclipse/che/main/devfile.yaml"}')
 echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
@@ -94,7 +119,7 @@ echo ""
 echo -e "${BLUE}Test 7: Resolve Factory with Validation${NC}"
 echo "POST $API_URL/factory/resolver?validate=true"
 RESPONSE=$(curl -s -X POST "$API_URL/factory/resolver?validate=true" \
-  -H "Authorization: Bearer $USERID:$USERNAME" \
+  -H "Authorization: Bearer ${AUTH_HEADER_VALUE}" \
   -H "Content-Type: application/json" \
   -d '{"url":"https://example.com/devfile.yaml"}')
 echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
@@ -104,7 +129,7 @@ echo ""
 echo -e "${BLUE}Test 8: Refresh Factory Token${NC}"
 echo "POST $API_URL/factory/token/refresh?url=https://github.com/user/repo"
 RESPONSE=$(curl -s -X POST "$API_URL/factory/token/refresh?url=https://github.com/user/repo" \
-  -H "Authorization: Bearer $USERID:$USERNAME" \
+  -H "Authorization: Bearer ${AUTH_HEADER_VALUE}" \
   -H "Content-Type: application/json")
 echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
 echo ""
@@ -113,7 +138,7 @@ echo ""
 echo -e "${BLUE}Test 10: Resolve Factory without Parameters (Error Test)${NC}"
 echo "POST $API_URL/factory/resolver"
 RESPONSE=$(curl -s -X POST $API_URL/factory/resolver \
-  -H "Authorization: Bearer $USERID:$USERNAME" \
+  -H "Authorization: Bearer ${AUTH_HEADER_VALUE}" \
   -H "Content-Type: application/json" \
   -d '{}')
 echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
