@@ -62,7 +62,35 @@ fi
 
 export LOCAL_RUN=true
 
-echo "[INFO] Building and starting server..."
-yarn build:dev && yarn start:debug
+echo "[INFO] Building server..."
+yarn build:dev
+
+SWAGGER_URL="http://localhost:8080/swagger"
+HEALTH_URL="http://localhost:8080/health"
+
+print_swagger_when_ready() {
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "[INFO] Swagger UI: ${SWAGGER_URL}"
+    return 0
+  fi
+
+  # Wait until the server is reachable, then print Swagger UI URL once.
+  for _ in $(seq 1 120); do
+    if curl -fsS "${HEALTH_URL}" >/dev/null 2>&1; then
+      echo ""
+      echo "[INFO] Swagger UI: ${SWAGGER_URL}"
+      echo ""
+      return 0
+    fi
+    sleep 0.25
+  done
+
+  # If health never became reachable, still print the URL (it may come up later).
+  echo "[INFO] Swagger UI: ${SWAGGER_URL}"
+}
+
+echo "[INFO] Starting server..."
+print_swagger_when_ready &
+yarn start:debug
 
 
