@@ -1,10 +1,12 @@
 # Kubernetes CheCluster patch for Eclipse Che Server (TypeScript)
 #
 # Usage with chectl:
+# IMPORTANT: chectl does NOT run envsubst on this file.
+# So for chectl usage, keep a concrete image value below.
 #   chectl server:deploy --platform=openshift --batch --che-operator-cr-patch-yaml=$(PWD)/cr-patch.yaml
 #   chectl server:update --che-operator-cr-patch-yaml=$(PWD)/cr-patch.yaml
 #
-# Usage with kubectl (recommended for custom images):
+# Usage with kubectl (if you WANT env vars):
 #   export IMAGE_REGISTRY_HOST=docker.io
 #   export IMAGE_REGISTRY_USER_NAME=your-username
 #   export IMAGE_TAG=next
@@ -25,6 +27,7 @@ spec:
     cheServer:
       deployment:
         containers:
-          - image: '${IMAGE_REGISTRY_HOST:-docker.io}/${IMAGE_REGISTRY_USER_NAME:-olexii4dockerid}/che-server:${IMAGE_TAG:-next}'
+          # Concrete image value (works with chectl):
+          - image: 'docker.io/olexii4dockerid/che-server:next'
             imagePullPolicy: Always
             name: che-server
